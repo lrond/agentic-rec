@@ -13,10 +13,12 @@ data/*
 !data/raw/
 !data/raw/**
 
-# Artifacts — track only metrics
+# Artifacts — track metrics and model checkpoints
 artifacts/*
 !artifacts/.gitkeep
 !artifacts/eval_metrics.json
+!artifacts/ranker.pt
+!artifacts/world_model.pt
 
 *.zip
 *.tar
