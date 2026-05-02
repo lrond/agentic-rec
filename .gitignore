@@ -1,0 +1,30 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+
+# Data — track embedding matrices and raw data
+data/*
+!data/.gitkeep
+!data/processed/
+!data/processed/news_vectors_*.npz
+!data/raw/
+!data/raw/**
+
+# Artifacts — track only metrics
+artifacts/*
+!artifacts/.gitkeep
+!artifacts/eval_metrics.json
+
+*.zip
+*.tar
+*.tar.gz
+*.ckpt
+*.pt
+*.pth
+*.egg-info/
+*.egg
+data/raw/mind/MINDsmall_train/behaviors_train.tsv.gz
+data/raw/

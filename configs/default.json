@@ -1,0 +1,11 @@
+{
+  "embedding_dim": 256,
+  "history_size": 50,
+  "beam_width": 5,
+  "branching_factor": 8,
+  "plan_horizon": 3,
+  "top_k": 10,
+  "delta_t": 1.0,
+  "krylov_steps": 8,
+  "world_model_type": "neural_ode"
+}

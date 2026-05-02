@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-rec"
+version = "0.1.0"
+description = "Production-inspired intent-drift news recommendation planner"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+train = [
+    "torch>=2.3",
+    "sentence-transformers>=2.7.0",
+    "transformers>=4.51.0",
+]
+qwen-train = [
+    "accelerate>=0.30.0",
+    "peft>=0.11.0",
+    "transformers>=4.51.0",
+    "torch>=2.3",
+]
+
+[project.scripts]
+agentic-rec-demo = "agentic_rec.demo.web_app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
