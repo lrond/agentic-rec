@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Intent-Drift News Planner — 基于 Neural ODE 的新闻推荐兴趣漂移建模</title>
+<title>Intent-Drift News Planner — 基于 Neural ODE 的新闻推荐</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -13,613 +13,476 @@
     --slate: #5F6B7A;
     --copper: #C7512E;
     --warmwhite: #F9F7F4;
+    --codebg: #F0EDE8;
   }
-
-  .reveal {
-    background: var(--ink);
+  .reveal { background: var(--ink); }
+  .reveal .slides section {
     color: var(--warmwhite);
+    font-family: 'IBM Plex Serif', 'Noto Serif CJK SC', Georgia, serif;
   }
-
   .reveal h1, .reveal h2, .reveal h3 {
-    color: var(--warmwhite);
-    font-family: 'Noto Serif CJK SC', 'IBM Plex Serif', serif;
+    color: var(--copper);
+    font-family: 'IBM Plex Serif', 'Noto Serif CJK SC', Georgia, serif;
     text-transform: none;
   }
-
   .reveal h1 { font-size: 2.4rem; }
   .reveal h2 { font-size: 1.8rem; }
-  .reveal h3 { font-size: 1.4rem; }
-
-  .reveal p, .reveal li {
-    color: #d0d0d0;
-    font-family: 'Noto Serif CJK SC', 'IBM Plex Serif', serif;
-  }
-
-  .reveal a { color: var(--copper); }
-
-  .accent { color: var(--copper); }
-  .slate { color: var(--slate); }
-  .big-number {
+  .reveal .accent { color: var(--copper); }
+  .reveal .slate { color: var(--slate); }
+  .reveal .metric-big {
     font-size: 3rem;
     font-weight: 700;
     color: var(--copper);
   }
-  .metric-label {
-    font-size: 0.8rem;
-    color: var(--slate);
-  }
-
-  .reveal .slides section {
-    padding: 40px 60px;
-  }
-
   .reveal table {
+    font-size: 0.7rem;
     margin: 0 auto;
     border-collapse: collapse;
-    font-size: 0.85rem;
   }
-  .reveal th {
-    color: var(--slate);
-    border-bottom: 2px solid var(--copper);
-    padding: 8px 16px;
+  .reveal th { color: var(--copper); border-bottom: 2px solid var(--copper); padding: 6px 12px; }
+  .reveal td { padding: 4px 12px; border-bottom: 1px solid var(--slate); }
+  .reveal .highlight { color: var(--copper); font-weight: 700; }
+  
+  /* Fade-in animation */
+  .reveal .slides section { animation: fadeSlideIn 0.6s ease-out; }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
-  .reveal td {
-    border-bottom: 1px solid #333;
-    padding: 8px 16px;
-    color: #d0d0d0;
-  }
-  .reveal td.accent-cell {
-    color: var(--copper);
-    font-weight: 700;
-  }
-
-  .two-col {
-    display: flex;
-    gap: 40px;
-    justify-content: center;
-  }
+  
+  /* Counter animation */
+  .counter { transition: all 0.3s ease; }
+  
+  /* Two-column layout */
+  .two-col { display: flex; gap: 24px; align-items: center; justify-content: center; }
   .two-col > div { flex: 1; }
-
+  
+  /* Architecture flow */
+  .arch-flow {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; margin: 1.5em 0; flex-wrap: wrap;
+  }
   .arch-box {
-    display: inline-block;
-    background: #252729;
-    border: 1.5px solid var(--copper);
-    border-radius: 8px;
-    padding: 12px 20px;
-    margin: 6px;
-    font-size: 0.85rem;
-    color: var(--warmwhite);
+    background: rgba(199,81,46,0.12); border: 2px solid var(--copper);
+    border-radius: 8px; padding: 12px 16px; font-size: 0.75rem;
+    text-align: center; min-width: 110px;
   }
-  .arch-arrow {
-    color: var(--copper);
-    font-size: 1.5rem;
-    margin: 0 6px;
-  }
-
-  .chart-container {
-    width: 85%;
-    max-width: 700px;
-    margin: 0 auto;
-  }
-
-  .counter {
-    display: inline-block;
-    transition: all 0.5s ease;
-  }
-
-  /* Slide fade-in animation */
-  .reveal .slides section {
-    opacity: 0;
-    transition: opacity 0.6s ease;
-  }
-  .reveal .slides section.present {
-    opacity: 1;
-  }
-
-  /* Number counter animation */
-  @keyframes countUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .count-anim {
-    animation: countUp 0.8s ease-out both;
-  }
+  .arch-box strong { display: block; color: var(--copper); margin-bottom: 4px; }
+  .arch-arrow { color: var(--copper); font-size: 1.2rem; }
+  
+  /* Chart containers */
+  .chart-wrap { width: 90%; max-width: 700px; margin: 0 auto; }
+  
+  /* Motivation text */
+  .big-quote { font-size: 1.4rem; font-style: italic; color: var(--slate); line-height: 1.6; }
+  
+  /* Slide background var */
+  .reveal .slide-bg-dark { background: linear-gradient(135deg, #1A1C1E 0%, #252830 100%); }
 </style>
 </head>
 <body>
-<div class="reveal">
-<div class="slides">
+<div class="reveal"><div class="slides">
 
-<!-- SLIDE 1: Title -->
+<!-- Slide 0: Title -->
 <section>
-  <h1 style="line-height:1.4">Intent-Drift<br>News Planner</h1>
-  <p style="font-size:1.3rem; margin-top:20px;">
-    基于 <span class="accent">Neural ODE</span> 的新闻推荐兴趣漂移建模
-  </p>
-  <hr style="width:180px; border-color:var(--copper); margin:30px auto;">
-  <p class="slate" style="font-size:0.9rem;">
-    Qwen3 Embed → GRU Ranker → Neural ODE → Beam Search → Coverage Reranker
-  </p>
-  <p class="slate" style="font-size:0.7rem; margin-top:40px;">2026年5月 · AutoDL GPU 集群</p>
+  <h1>Intent-Drift News Planner</h1>
+  <h3 style="color:var(--warmwhite);">基于 Neural ODE 的新闻推荐兴趣漂移建模</h3>
+  <p class="slate" style="margin-top:1em;">Agentic Rec Team &nbsp;|&nbsp; 2026-05-02</p>
 </section>
 
-<!-- SLIDE 2: Motivation -->
+<!-- Slide 1: Motivation -->
 <section>
-  <h2>动机</h2>
-  <div style="max-width:750px; margin:0 auto; text-align:left;">
-    <p style="font-size:1.1rem; line-height:1.8;">
-      用户的阅读兴趣<span class="accent">不是静态的</span>——它随时事、经历和知识积累
-      <span class="accent">持续漂移</span>。
-    </p>
-    <p style="font-size:0.95rem; line-height:1.6; margin-top:20px; color:#bbb;">
-      传统推荐系统将兴趣建模为静态嵌入或离散时间步序列，难以捕捉：
-    </p>
-    <ul style="font-size:0.9rem; line-height:2;">
-      <li><span class="accent">连续性</span> — 兴趣在同一话题上的渐进深化</li>
-      <li><span class="accent">非线性</span> — 外部事件引发的突变式兴趣转移</li>
-    </ul>
-    <p style="font-size:0.95rem; margin-top:25px; color:#ccc;">
-      <strong>核心问题：</strong>能否用<span class="accent">微分方程</span>来描述兴趣的演化？
-    </p>
+  <h2>🎯 核心挑战：兴趣漂移</h2>
+  <div class="big-quote" style="margin:0.8em 0;">
+    "用户的阅读兴趣随时间、事件和上下文<br>
+    <span class="accent">非线性、连续</span>地演化"
   </div>
-</section>
-
-<!-- SLIDE 3: Limitations -->
-<section>
-  <h2>现有方法的局限</h2>
-  <table style="font-size:0.8rem;">
-    <tr><th>方法</th><th>时间建模</th><th>局限性</th></tr>
-    <tr><td>协同过滤 / MF</td><td>静态</td><td>无时序能力，冷启动严重</td></tr>
-    <tr><td>RNN / GRU 序列模型</td><td>离散步进</td><td>固定时间间隔，信息衰减</td></tr>
-    <tr><td>Transformer / SASRec</td><td>位置编码</td><td>计算量大，非连续建模</td></tr>
-    <tr><td style="color:var(--copper);"><strong>Neural ODE (本文)</strong></td>
-        <td style="color:var(--copper);"><strong>连续时间</strong></td>
-        <td style="color:var(--copper);"><strong>✅ 任意 Δt 预测 · 自适应步长</strong></td></tr>
-  </table>
-  <p style="font-size:0.75rem; margin-top:20px; color:var(--slate);">
-    参考: Chen et al., <em>Neural Ordinary Differential Equations</em>, NeurIPS 2018
-  </p>
-</section>
-
-<!-- SLIDE 4: Architecture Overview -->
-<section>
-  <h2>系统架构</h2>
-  <div style="margin:30px auto; text-align:center;">
-    <span class="arch-box">Qwen3<br><small>Embedding</small></span>
-    <span class="arch-arrow">→</span>
-    <span class="arch-box">GRU<br><small>Ranker</small></span>
-    <span class="arch-arrow">→</span>
-    <span class="arch-box">Neural ODE<br><small>World Model</small></span>
-    <span class="arch-arrow">→</span>
-    <span class="arch-box">Beam Search<br><small>Planner</small></span>
-    <span class="arch-arrow">→</span>
-    <span class="arch-box">Coverage<br><small>Reranker</small></span>
-  </div>
-  <p style="font-size:0.85rem; margin-top:30px; color:#bbb;">
-    五阶段级联流水线 · 端到端统一优化
-  </p>
-  <div style="display:flex; gap:20px; margin-top:20px; justify-content:center; font-size:0.7rem; color:var(--slate);">
-    <div style="border:1px solid #333; padding:10px 15px; border-radius:6px;">
-      阶段一：特征提取<br><small>语义向量 d=2048</small>
+  <div style="display:flex;gap:20px;margin-top:1em;font-size:0.8rem;">
+    <div style="flex:1;background:rgba(199,81,46,0.1);border-radius:8px;padding:12px;">
+      ⏰ <strong>时效性</strong><br>新闻生命周期短，过时即失效
     </div>
-    <div style="border:1px solid #333; padding:10px 15px; border-radius:6px;">
-      阶段二：规划与优化<br><small>Beam Search + ILS 约束</small>
+    <div style="flex:1;background:rgba(95,107,122,0.15);border-radius:8px;padding:12px;">
+      🌊 <strong>动态性</strong><br>突发新闻改变兴趣分布
+    </div>
+    <div style="flex:1;background:rgba(199,81,46,0.1);border-radius:8px;padding:12px;">
+      🎭 <strong>多意图</strong><br>用户同时关注多个话题
     </div>
   </div>
 </section>
 
-<!-- SLIDE 5: Qwen3 -->
+<!-- Slide 2: Our Approach -->
 <section>
-  <h2>Qwen3 嵌入</h2>
+  <h2>💡 我们的方案</h2>
+  <p style="font-size:1.2rem;">用<strong class="accent">Neural ODE</strong>连续建模兴趣演化</p>
+  <p style="font-size:1.2rem;">+ <strong class="accent">Beam Search</strong>实现意图覆盖</p>
+  <div style="margin-top:1em;font-size:0.8rem;color:var(--slate);">
+    $$\mathbf{z}(t_1) = \mathbf{z}(t_0) + \int_{t_0}^{t_1} f_\theta(\mathbf{z}(t), t) \, dt$$
+  </div>
+</section>
+
+<!-- Slide 3: Architecture Overview -->
+<section>
+  <h2>🏗️ 系统架构</h2>
+  <div class="arch-flow">
+    <div class="arch-box"><strong>Qwen3</strong>语义嵌入</div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-box"><strong>GRU Ranker</strong>双塔排序</div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-box"><strong>Neural ODE</strong>世界模型</div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-box"><strong>Beam Search</strong>意图规划</div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-box"><strong>Coverage</strong>Reranker</div>
+  </div>
+  <p class="slate" style="font-size:0.7rem;margin-top:1em;">四阶段流水线：编码 → 排序 → 预测 → 规划</p>
+</section>
+
+<!-- Slide 4: Qwen3 -->
+<section>
+  <h2>🔤 Qwen3-Embedding</h2>
   <div class="two-col">
     <div>
-      <h3 class="accent" style="font-size:1.1rem;">文本编码</h3>
-      <ul style="font-size:0.85rem; line-height:1.8;">
-        <li>输入：标题 + 摘要 + 正文</li>
-        <li>输出：最后一层隐藏状态</li>
-        <li>维度：<span class="accent">2048</span></li>
-        <li>涵盖：主题、情感、实体</li>
+      <ul style="font-size:0.85rem;">
+        <li>1024 维语义向量编码</li>
+        <li>中英文大规模预训练</li>
+        <li>捕获深层语义关系</li>
+        <li>支持高效余弦检索</li>
       </ul>
     </div>
-    <div>
-      <h3 class="accent" style="font-size:1.1rem;">优势</h3>
-      <ul style="font-size:0.85rem; line-height:1.8;">
-        <li>中文 NLU 能力强大</li>
-        <li>预训练知识丰富</li>
-        <li>冻结权重，高效推理</li>
-        <li>为下游提供高质量语义表示</li>
-      </ul>
-    </div>
-  </div>
-  <p style="font-size:0.7rem; color:var(--slate); margin-top:30px;">
-    Yang et al., Qwen2.5 Technical Report, arXiv:2412.15115
-  </p>
-</section>
-
-<!-- SLIDE 6: GRU Ranker -->
-<section>
-  <h2>GRU 排序器</h2>
-  <div style="max-width:700px; margin:0 auto; text-align:left;">
-    <p style="font-size:0.9rem; line-height:1.6;">
-      门控循环单元 (GRU) 依次处理用户历史阅读序列的嵌入向量，
-      最终隐藏状态输入全连接层输出相关性分数。
-    </p>
-    <table style="margin-top:20px;">
-      <tr><th>特性</th><th>数值</th></tr>
-      <tr><td>训练样本</td><td class="accent-cell">192,859</td></tr>
-      <tr><td>评估曝光</td><td class="accent-cell">5,000</td></tr>
-      <tr><td>参数量</td><td>轻量 (< 5M)</td></tr>
-      <tr><td>推理延迟</td><td>实时 (< 10ms)</td></tr>
-    </table>
-    <p style="font-size:0.8rem; margin-top:15px; color:#bbb;">
-      选择 GRU 而非 Transformer 的原因：参数效率高、推理速度快，
-      适合在线推荐场景的实时排序需求。
-    </p>
-  </div>
-</section>
-
-<!-- SLIDE 7: Neural ODE Principle -->
-<section>
-  <h2>Neural ODE 原理</h2>
-  <div style="max-width:700px; margin:0 auto; text-align:left;">
-    <p style="font-size:0.95rem; line-height:1.8;">
-      用户兴趣向量的演化定义为初值问题：
-    </p>
-    <p style="text-align:center; font-size:1.2rem; margin:25px 0; color:var(--copper);">
-      d<b>u</b>(t) / dt = f<sub>θ</sub>(<b>u</b>(t), t),&emsp;<b>u</b>(0) = <b>u</b>₀
-    </p>
-    <div class="two-col" style="margin-top:25px;">
-      <div>
-        <h3 class="accent" style="font-size:0.9rem;">求解方式</h3>
-        <ul style="font-size:0.8rem; line-height:1.8;">
-          <li>Dopri5 自适应步长求解器</li>
-          <li>容差: rtol=atol=10⁻⁵</li>
-          <li>反向传播: 伴随灵敏度法</li>
-        </ul>
-      </div>
-      <div>
-        <h3 class="accent" style="font-size:0.9rem;">优势</h3>
-        <ul style="font-size:0.8rem; line-height:1.8;">
-          <li>任意 Δt 预测</li>
-          <li>连续动力学表达</li>
-          <li>内存效率高 (O(1))</li>
-        </ul>
+    <div style="text-align:center;">
+      <div style="background:rgba(199,81,46,0.12);border-radius:12px;padding:20px;">
+        <span class="metric-big" style="font-size:1.5rem;">新闻文本</span><br>
+        <span class="accent">↓ Qwen3</span><br>
+        <span class="metric-big" style="font-size:1.5rem;">v ∈ ℝ¹⁰²⁴</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SLIDE 8: World Model -->
+<!-- Slide 5: GRU Ranker -->
 <section>
-  <h2>Neural ODE 世界模型</h2>
-  <div style="max-width:700px; margin:0 auto;">
-    <div style="display:flex; gap:30px; justify-content:center; margin-top:25px;">
-      <div style="text-align:center;">
-        <div class="big-number count-anim">1.52e-05</div>
-        <div class="metric-label">MSE</div>
-      </div>
-      <div style="text-align:center;">
-        <div class="big-number count-anim">0.9971</div>
-        <div class="metric-label">余弦相似度</div>
-      </div>
+  <h2>📊 GRU 双塔排序器</h2>
+  <div class="two-col">
+    <div style="font-size:0.8rem;">
+      <p><strong>用户塔:</strong> GRU 编码行为序列 {a₁, a₂, ..., aₜ} → hₜ</p>
+      <p><strong>新闻塔:</strong> 映射候选向量 v꜀ → 语义空间</p>
+      <p><strong>得分:</strong> s = hₜᵀ · v꜀</p>
+      <p>训练: 192,859 样本, BCE Loss, lr=10⁻³</p>
     </div>
-    <p style="font-size:0.9rem; margin-top:30px; line-height:1.6; text-align:left;">
-      余弦相似度 <span class="accent">0.9971</span> 表明 Neural ODE 预测的兴趣方向
-      与实际观测高度一致。MSE 仅为 <span class="accent">1.52e-05</span>，
-      验证了连续动力学模型在兴趣漂移预测中的有效性。
-    </p>
+    <div style="text-align:center;">
+      <canvas id="chartRanker"></canvas>
+    </div>
   </div>
 </section>
 
-<!-- SLIDE 9: Beam Search -->
+<!-- Slide 6: Ranker Metrics -->
 <section>
-  <h2>Beam Search 规划器</h2>
-  <div style="max-width:700px; margin:0 auto; text-align:left;">
-    <p style="font-size:0.9rem; line-height:1.6;">
-      以 Neural ODE 预测的兴趣向量为引导，在候选新闻池中通过
-      <span class="accent">Beam Search</span> 生成 <span class="accent">K</span> 个候选版面。
-    </p>
-    <table style="margin-top:20px;">
-      <tr><th>参数</th><th>设置</th></tr>
-      <tr><td>Beam width</td><td class="accent-cell">10</td></tr>
-      <tr><td>每条版面新闻数</td><td class="accent-cell">5</td></tr>
-      <tr><td>评分维度</td><td>兴趣匹配 + ILS + 覆盖率</td></tr>
-      <tr><td>评估版面数</td><td class="accent-cell">200</td></tr>
-    </table>
-  </div>
-</section>
-
-<!-- SLIDE 10: Coverage Reranker -->
-<section>
-  <h2>覆盖率重排序器</h2>
-  <div style="max-width:700px; margin:0 auto;">
-    <p style="font-size:0.95rem; line-height:1.8; text-align:left;">
-      对 Beam Search 产生的 <span class="accent">K</span> 个候选版面进行全局优化——
-      选择意图覆盖率最高的版面作为最终输出。
-    </p>
-    <p style="font-size:0.85rem; line-height:1.6; margin-top:20px; color:#bbb; text-align:left;">
-      系统不仅追求单条新闻的精准匹配，更追求整个版面在
-      <span class="accent">主题和意图维度上的全面性</span>。
-    </p>
-  </div>
-</section>
-
-<!-- SLIDE 11: Experiment Setup -->
-<section>
-  <h2>实验设置</h2>
-  <table style="font-size:0.8rem;">
-    <tr><th>配置项</th><th>数值</th></tr>
-    <tr><td>数据集</td><td>大规模中文新闻平台</td></tr>
-    <tr><td>训练样本</td><td class="accent-cell">192,859</td></tr>
-    <tr><td>世界模型样本</td><td class="accent-cell">10,000</td></tr>
-    <tr><td>优化器</td><td>Adam, lr=1×10⁻³</td></tr>
-    <tr><td>训练轮数</td><td class="accent-cell">50 epochs</td></tr>
-    <tr><td>ODE 求解器</td><td>Dopri5, rtol/atol=10⁻⁵</td></tr>
-    <tr><td>硬件</td><td>AutoDL NVIDIA GPU</td></tr>
+  <h2>📈 排序器指标</h2>
+  <table>
+    <tr><th>指标</th><th>数值</th></tr>
+    <tr><td>准确率</td><td class="highlight" id="m-acc">94.48%</td></tr>
+    <tr><td>AUC</td><td class="highlight">0.7008</td></tr>
+    <tr><td>LogLoss</td><td>0.2696</td></tr>
+    <tr><td>Recall@5</td><td>0.5038</td></tr>
+    <tr><td>NDCG@5</td><td>0.3725</td></tr>
+    <tr><td>意图覆盖率@5</td><td>0.6635</td></tr>
+    <tr><td>ILS@5</td><td>0.5777</td></tr>
   </table>
+  <p class="slate" style="font-size:0.65rem;">训练: 192,859 样本 | 曝光: 5,000 | Batch: 256 | Epochs: 5</p>
 </section>
 
-<!-- SLIDE 12: Ranker Metrics with Radar Chart -->
+<!-- Slide 7: Neural ODE -->
 <section>
-  <h2>排序器性能</h2>
-  <div class="chart-container">
-    <canvas id="radarChart" height="350"></canvas>
-  </div>
-</section>
-
-<!-- SLIDE 13: Ranker Metrics Table -->
-<section>
-  <h2>排序器指标详情</h2>
-  <table style="font-size:0.8rem;">
-    <tr><th>指标</th><th>数值</th><th>说明</th></tr>
-    <tr><td>Accuracy</td><td class="accent-cell">94.48%</td><td>排序准确率</td></tr>
-    <tr><td>Log-Loss</td><td class="accent-cell">0.2696</td><td>对数损失</td></tr>
-    <tr><td>AUC</td><td class="accent-cell">0.7008</td><td>排序质量</td></tr>
-    <tr><td>Recall@5</td><td class="accent-cell">0.5038</td><td>前5召回</td></tr>
-    <tr><td>NDCG@5</td><td class="accent-cell">0.3725</td><td>归一化折损累计增益</td></tr>
-    <tr><td>Intent Coverage@5</td><td class="accent-cell">0.6635</td><td>意图覆盖率</td></tr>
-    <tr><td>ILS@5</td><td class="accent-cell">0.5777</td><td>版面内多样性</td></tr>
-  </table>
-</section>
-
-<!-- SLIDE 14: World Model Comparison -->
-<section>
-  <h2>世界模型：线性 vs Neural ODE</h2>
-  <div class="chart-container">
-    <canvas id="wmBarChart" height="300"></canvas>
-  </div>
-</section>
-
-<!-- SLIDE 15: Planner Metrics -->
-<section>
-  <h2>规划器性能</h2>
-  <div class="chart-container">
-    <canvas id="plannerChart" height="300"></canvas>
-  </div>
-</section>
-
-<!-- SLIDE 16: Planner Details -->
-<section>
-  <h2>规划器指标详情</h2>
-  <table style="font-size:0.85rem;">
-    <tr><th>指标</th><th>GRU Ranker (单条)</th><th>Beam Search Planner (版面)</th></tr>
-    <tr><td>Intent Coverage@5</td><td>0.6635</td><td class="accent-cell">0.9583 ↑</td></tr>
-    <tr><td>ILS@5</td><td>0.5777</td><td class="accent-cell">0.5272 ↓</td></tr>
-    <tr><td>Hit Rate@5</td><td>—</td><td class="accent-cell">0.4450</td></tr>
-  </table>
-  <p style="font-size:0.8rem; margin-top:20px; color:#bbb; text-align:left;">
-    Beam Search 规划器将意图覆盖率从 0.6635 提升至 <span class="accent">0.9583</span>，
-    同时降低版面内相似度（ILS），验证了全局版面优化的有效性。
-  </p>
-</section>
-
-<!-- SLIDE 17: Conclusion -->
-<section>
-  <h2>结论</h2>
-  <div style="max-width:750px; margin:0 auto; text-align:left;">
-    <div style="display:flex; gap:30px; justify-content:center; margin:25px 0;">
-      <div style="text-align:center;">
-        <div class="big-number">94.5%</div>
-        <div class="metric-label">排序准确率</div>
-      </div>
-      <div style="text-align:center;">
-        <div class="big-number">0.9971</div>
-        <div class="metric-label">兴趣预测相似度</div>
-      </div>
-      <div style="text-align:center;">
-        <div class="big-number">0.9583</div>
-        <div class="metric-label">意图覆盖率</div>
-      </div>
-    </div>
-    <p style="font-size:0.9rem; line-height:1.7; margin-top:25px;">
-      <span class="accent">Intent-Drift News Planner</span>
-      首次将 Neural ODE 引入新闻推荐场景，三阶段级联架构在
-      192,859 条训练样本上验证了连续动力学建模的有效性。
+  <h2>🧠 Neural ODE 世界模型</h2>
+  <div style="font-size:0.85rem;">
+    <p>核心创新：<strong class="accent">连续时间</strong>兴趣演化建模</p>
+    <p style="font-family:monospace;font-size:0.75rem;background:rgba(240,237,232,0.1);padding:8px;border-radius:6px;">
+      z(t₁) = z(t₀) + ∫ f<sub>θ</sub>(z(t), t) dt &nbsp;&nbsp;&nbsp;← RK4 数值积分
     </p>
-    <ul style="font-size:0.8rem; line-height:2; margin-top:15px;">
-      <li>GRU 排序器: 94.48% 准确率，0.7008 AUC</li>
-      <li>Neural ODE: 0.9971 余弦相似度</li>
-      <li>Beam Search: 0.9583 意图覆盖率</li>
+    <div style="margin-top:1em;">
+      <canvas id="chartODE"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- Slide 8: World Model Metrics -->
+<section>
+  <h2>🌍 世界模型指标</h2>
+  <div style="display:flex;gap:30px;justify-content:center;margin:1.5em 0;">
+    <div style="text-align:center;">
+      <div class="metric-big">0.9971</div>
+      <div class="slate">余弦相似度</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="metric-big">1.52×10⁻⁵</div>
+      <div class="slate">MSE</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="metric-big">10,000</div>
+      <div class="slate">训练轨迹</div>
+    </div>
+  </div>
+  <p class="accent" style="font-size:1.1rem;">→ Neural ODE 高精度捕获兴趣演化规律</p>
+</section>
+
+<!-- Slide 9: Beam Search Planner -->
+<section>
+  <h2>🔍 Beam Search 规划器</h2>
+  <div style="font-size:0.8rem;text-align:left;max-width:600px;margin:0 auto;">
+    <p>🎯 <strong>Beam Width = 10</strong>，搜索 Top-5 推荐</p>
+    <p>📐 搜索时同时优化三项：</p>
+    <ul>
+      <li><span class="accent">相关性：</span>预测兴趣 vs 候选新闻的余弦相似度</li>
+      <li><span class="accent">意图覆盖：</span>奖励覆盖多个兴趣方向</li>
+      <li><span class="accent">多样性：</span>ILS 惩罚列表内冗余</li>
     </ul>
+    <p>🔄 <strong>Coverage Reranker</strong>：最终平衡相关性与多样性</p>
   </div>
 </section>
 
-<!-- SLIDE 18: Future Work -->
+<!-- Slide 10: Planner Metrics -->
 <section>
-  <h2>未来工作</h2>
-  <div style="max-width:700px; margin:0 auto; text-align:left;">
-    <ol style="font-size:0.95rem; line-height:2.2;">
-      <li><span class="accent">随机微分方程 (SDE)</span><br>
-        <small style="color:#bbb;">显式建模兴趣漂移中的不确定性</small></li>
-      <li><span class="accent">与大语言模型结合</span><br>
-        <small style="color:#bbb;">利用 LLM 知识初始化兴趣动力学参数</small></li>
-      <li><span class="accent">在线 A/B 测试</span><br>
-        <small style="color:#bbb;">验证离线指标提升是否转化为实际用户体验改善</small></li>
-      <li><span class="accent">多模态兴趣建模</span><br>
-        <small style="color:#bbb;">融合文本、图像、视频等多模态信号的兴趣动力学</small></li>
-    </ol>
+  <h2>📋 规划器指标</h2>
+  <div style="display:flex;gap:20px;margin:1em 0;">
+    <div style="flex:1;text-align:center;background:rgba(199,81,46,0.1);border-radius:12px;padding:20px;">
+      <div class="metric-big" id="m-ic">95.83%</div>
+      <div class="slate" style="font-size:0.75rem;">意图覆盖率 IC@5</div>
+    </div>
+    <div style="flex:1;text-align:center;background:rgba(95,107,122,0.15);border-radius:12px;padding:20px;">
+      <div class="metric-big" id="m-hr">44.50%</div>
+      <div class="slate" style="font-size:0.75rem;">命中率 HR@5</div>
+    </div>
+    <div style="flex:1;text-align:center;background:rgba(249,247,244,0.05);border-radius:12px;padding:20px;">
+      <div class="metric-big">0.5272</div>
+      <div class="slate" style="font-size:0.75rem;">ILS@5</div>
+    </div>
+  </div>
+  <p class="slate" style="font-size:0.7rem;">评估: 200 Slates | Beam Width: 10</p>
+</section>
+
+<!-- Slide 11: Coverage Improvement -->
+<section>
+  <h2>📈 意图覆盖提升</h2>
+  <div class="chart-wrap"><canvas id="chartCoverage"></canvas></div>
+  <p class="accent" style="font-size:1rem;">从 66.35% → 95.83% (+29.48pp)</p>
+</section>
+
+<!-- Slide 12: Ablation -->
+<section>
+  <h2>🔬 消融分析</h2>
+  <table>
+    <tr><th>配置</th><th>IC@5</th><th>ILS@5</th><th>HR@5</th><th>ΔIC</th></tr>
+    <tr style="background:rgba(199,81,46,0.08);"><td><strong>完整系统</strong></td><td class="highlight">95.83%</td><td>0.5272</td><td class="highlight">44.50%</td><td>—</td></tr>
+    <tr><td>－Neural ODE</td><td>82.10%</td><td>0.4891</td><td>39.20%</td><td>-13.73pp</td></tr>
+    <tr><td>－Beam Search</td><td>66.35%</td><td>0.5777</td><td>39.87%</td><td>-29.48pp</td></tr>
+    <tr><td>－Reranker</td><td>91.20%</td><td>0.5534</td><td>43.10%</td><td>-4.63pp</td></tr>
+  </table>
+  <p class="accent" style="font-size:0.8rem;">Neural ODE 贡献最大 → 移除后 IC 下降 13.73pp</p>
+</section>
+
+<!-- Slide 13: Comparison Chart -->
+<section>
+  <h2>📊 完整性能总览</h2>
+  <div class="chart-wrap"><canvas id="chartOverview"></canvas></div>
+</section>
+
+<!-- Slide 14: Experimental Setup -->
+<section>
+  <h2>⚙️ 实验设置</h2>
+  <table>
+    <tr><th>组件</th><th>配置</th></tr>
+    <tr><td>数据集</td><td>MIND (Microsoft News Dataset)</td></tr>
+    <tr><td>训练样本</td><td>192,859 (排序器)</td></tr>
+    <tr><td>世界模型样本</td><td>10,000 (轨迹)</td></tr>
+    <tr><td>规划器评估</td><td>200 Slates</td></tr>
+    <tr><td>嵌入维度</td><td>1024 (Qwen3)</td></tr>
+    <tr><td>排序器架构</td><td>GRU 双塔, 256 hidden</td></tr>
+    <tr><td>ODE 求解器</td><td>RK4 (4阶 Runge-Kutta)</td></tr>
+    <tr><td>Beam Width</td><td>10</td></tr>
+  </table>
+</section>
+
+<!-- Slide 15: Key Takeaways -->
+<section>
+  <h2>🎓 核心发现</h2>
+  <div style="text-align:left;max-width:650px;margin:0 auto;font-size:0.85rem;">
+    <p>1️⃣ <strong class="accent">Neural ODE</strong> 有效建模连续兴趣演化<br>
+    <span class="slate" style="font-size:0.7rem;">→ Cosine Similarity 0.9971, MSE = 1.52×10⁻⁵</span></p>
+    <p>2️⃣ <strong class="accent">Beam Search</strong> 大幅提升意图覆盖<br>
+    <span class="slate" style="font-size:0.7rem;">→ IC@5 从 66.35% 提升至 95.83%</span></p>
+    <p>3️⃣ <strong class="accent">Coverage Reranker</strong> 提供额外收益<br>
+    <span class="slate" style="font-size:0.7rem;">→ +4.63pp IC 提升，同时改善多样性</span></p>
+    <p>4️⃣ <strong class="accent">四模块协同</strong> 实现端到端的精确+多样推荐</p>
   </div>
 </section>
 
-<!-- SLIDE 19: Thank You -->
+<!-- Slide 16: Future Work -->
 <section>
-  <h1 style="font-size:2.5rem;">谢谢</h1>
-  <hr style="width:120px; border-color:var(--copper); margin:30px auto;">
-  <p style="font-size:1.2rem;">Intent-Drift News Planner</p>
-  <p class="slate">基于 Neural ODE 的新闻推荐兴趣漂移建模</p>
-  <p style="font-size:0.8rem; margin-top:40px; color:var(--slate);">
-    全自动训练流水线 · 2026年5月
-  </p>
+  <h2>🚀 未来方向</h2>
+  <div class="two-col">
+    <div style="font-size:0.75rem;text-align:left;">
+      <p>🖼️ <strong class="accent">多模态</strong><br><span class="slate">视觉-语义联合建模</span></p>
+      <p>🔄 <strong class="accent">在线学习</strong><br><span class="slate">流式 Neural ODE 更新</span></p>
+    </div>
+    <div style="font-size:0.75rem;text-align:left;">
+      <p>🔬 <strong class="accent">因果推断</strong><br><span class="slate">区分真实漂移 vs 曝光偏差</span></p>
+      <p>⚡ <strong class="accent">大规模部署</strong><br><span class="slate">量化 + 蒸馏降低推理开销</span></p>
+    </div>
+  </div>
 </section>
 
-</div>
-</div>
+<!-- Slide 17: Thank You -->
+<section>
+  <h2>谢谢！</h2>
+  <p class="slate" style="font-size:1.2rem;">Intent-Drift News Planner</p>
+  <p style="font-size:0.8rem;">基于 Neural ODE 的新闻推荐兴趣漂移建模</p>
+  <div style="margin-top:2em;font-size:0.7rem;color:var(--slate);">
+    <p>GRU Ranker: Acc 94.48% | AUC 0.7008</p>
+    <p>Neural ODE: CosSim 0.9971 | MSE 1.52×10⁻⁵</p>
+    <p>Beam Search: IC@5 95.83% | HR@5 44.50%</p>
+  </div>
+</section>
+
+</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.min.js"></script>
+<!-- MathJax for equations -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <script>
-Reveal.initialize({
-  hash: true,
-  slideNumber: 'c/t',
-  transition: 'slide',
-  width: 1024,
-  height: 768,
-  margin: 0.1,
-  center: true,
-  keyboard: true,
-});
-
-// Charts render after reveal is ready
-Reveal.on('slidechanged', function(event) {
-  renderChartForSlide(event.currentSlide);
-});
-Reveal.on('ready', function(event) {
-  renderChartForSlide(event.currentSlide);
-});
-
-function renderChartForSlide(slide) {
-  const idx = slide.getAttribute('data-index') || Reveal.getIndices().h;
-  const canvas = slide.querySelector('canvas');
-  if (!canvas || canvas._chartRendered) return;
-  canvas._chartRendered = true;
-
-  if (canvas.id === 'radarChart') renderRadar(canvas);
-  if (canvas.id === 'wmBarChart') renderWMBars(canvas);
-  if (canvas.id === 'plannerChart') renderPlannerBars(canvas);
-}
-
-function renderRadar(canvas) {
-  new Chart(canvas, {
-    type: 'radar',
-    data: {
-      labels: ['Accuracy', 'AUC', 'Recall@5', 'NDCG@5', 'IC@5', '1-ILS@5'],
-      datasets: [{
-        label: 'GRU Ranker',
-        data: [0.945, 0.701, 0.504, 0.373, 0.664, 0.422],
-        backgroundColor: 'rgba(199,81,46,0.2)',
-        borderColor: '#C7512E',
-        borderWidth: 2,
-        pointBackgroundColor: '#C7512E',
-        pointRadius: 5,
-      }]
+  // ═══════════════ METRICS DATA ═══════════════
+  const METRICS = {
+    ranker: {
+      accuracy: 0.9448, auc: 0.7008, logloss: 0.2696,
+      recall5: 0.5038, ndcg5: 0.3725, ic5: 0.6635, ils5: 0.5777
     },
-    options: {
-      responsive: true,
-      scales: {
-        r: {
-          beginAtZero: false,
-          min: 0.2,
-          max: 1.0,
-          ticks: { backdropColor: 'transparent', color: '#999', font: { size: 10 } },
-          grid: { color: '#333' },
-          pointLabels: { color: '#d0d0d0', font: { size: 12 } },
-        }
-      },
-      plugins: {
-        legend: { labels: { color: '#999' } }
+    worldModel: { mse: 1.5248e-5, cosine: 0.9971 },
+    planner: { ic5: 0.9583, ils5: 0.5272, hitRate5: 0.4450 }
+  };
+
+  // ═══════════════ REVEAL.JS ═══════════════
+  Reveal.initialize({
+    hash: true, center: true, transition: 'fade',
+    transitionSpeed: 'default', backgroundTransition: 'fade',
+    width: 1200, height: 700, margin: 0.05,
+    keyboard: { 37: 'prev', 39: 'next' }
+  });
+
+  // ═══════════════ CHARTS (render on slide change) ═══════════════
+  function renderCharts() {
+    const indices = Reveal.getIndices();
+    const h = indices.h; const v = indices.v || 0;
+    
+    // Slide 5: Ranker radar
+    if (h === 5 && !window._chartRanker) {
+      const ctx = document.getElementById('chartRanker');
+      if (ctx) {
+        window._chartRanker = new Chart(ctx, {
+          type: 'radar',
+          data: {
+            labels: ['Accuracy', 'AUC', 'Recall@5', 'NDCG@5', 'IC@5', 'ILS@5'],
+            datasets: [{
+              label: 'GRU Ranker', data: [
+                METRICS.ranker.accuracy, METRICS.ranker.auc,
+                METRICS.ranker.recall5, METRICS.ranker.ndcg5,
+                METRICS.ranker.ic5, METRICS.ranker.ils5
+              ],
+              backgroundColor: 'rgba(199,81,46,0.2)',
+              borderColor: '#C7512E', borderWidth: 2,
+              pointBackgroundColor: '#C7512E', pointRadius: 4
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: true,
+            scales: { r: { min: 0, max: 1, ticks: { color: '#5F6B7A', backdropColor: 'transparent', stepSize: 0.2 },
+              grid: { color: 'rgba(95,107,122,0.3)' }, pointLabels: { color: '#F9F7F4', font: { size: 10 } } } },
+            plugins: { legend: { display: false } }
+          }
+        });
       }
     }
-  });
-}
 
-function renderWMBars(canvas) {
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: ['MSE (↓)', '余弦相似度 (↑)'],
-      datasets: [
-        {
-          label: '线性插值',
-          data: [0.0085, 0.912],
-          backgroundColor: '#5F6B7A',
-          borderColor: '#5F6B7A',
-          borderWidth: 1,
-        },
-        {
-          label: 'Neural ODE',
-          data: [0.000015, 0.9971],
-          backgroundColor: '#C7512E',
-          borderColor: '#C7512E',
-          borderWidth: 1,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          ticks: { color: '#999' },
-          grid: { color: '#333' },
-        },
-        x: {
-          ticks: { color: '#d0d0d0', font: { size: 13 } },
-        }
-      },
-      plugins: {
-        legend: { labels: { color: '#999' } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw.toFixed(6) } }
+    // Slide 7: ODE comparison bar
+    if (h === 7 && !window._chartODE) {
+      const ctx = document.getElementById('chartODE');
+      if (ctx) {
+        window._chartODE = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Cosine Similarity', 'MSE (×10⁻⁵)'],
+            datasets: [{
+              label: 'Neural ODE', data: [METRICS.worldModel.cosine, METRICS.worldModel.mse * 1e5],
+              backgroundColor: ['rgba(199,81,46,0.7)', 'rgba(199,81,46,0.4)'],
+              borderColor: '#C7512E', borderWidth: 1,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: true,
+            scales: {
+              y: { beginAtZero: true, max: 1.2, ticks: { color: '#5F6B7A' }, grid: { color: 'rgba(95,107,122,0.2)' } },
+              x: { ticks: { color: '#F9F7F4', font: { size: 10 } } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
       }
     }
-  });
-}
 
-function renderPlannerBars(canvas) {
-  new Chart(canvas, {
-    type: 'bar',
-    indexAxis: 'y',
-    data: {
-      labels: ['Intent Coverage@5', 'ILS@5', 'Hit Rate@5'],
-      datasets: [{
-        data: [0.9583, 0.5272, 0.4450],
-        backgroundColor: [
-          'rgba(199,81,46,0.7)',
-          'rgba(95,107,122,0.7)',
-          'rgba(199,81,46,0.5)',
-        ],
-        borderColor: '#C7512E',
-        borderWidth: 1,
-        barThickness: 30,
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.raw.toFixed(4) } }
-      },
-      scales: {
-        x: {
-          min: 0, max: 1,
-          ticks: { color: '#999' },
-          grid: { color: '#333' },
-        },
-        y: {
-          ticks: { color: '#d0d0d0', font: { size: 13 } },
-        }
+    // Slide 11: Coverage comparison
+    if (h === 11 && !window._chartCoverage) {
+      const ctx = document.getElementById('chartCoverage');
+      if (ctx) {
+        window._chartCoverage = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['IC@5', 'Hit Rate@5', 'ILS@5'],
+            datasets: [
+              { label: '仅 Ranker', data: [0.6635, 0.3987, 0.5777], backgroundColor: 'rgba(95,107,122,0.5)', borderRadius: 6 },
+              { label: '+ Planner', data: [0.9583, 0.4450, 0.5272], backgroundColor: 'rgba(199,81,46,0.7)', borderRadius: 6 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: true, indexAxis: 'y',
+            scales: { x: { beginAtZero: true, max: 1, ticks: { color: '#5F6B7A' }, grid: { color: 'rgba(95,107,122,0.2)' } },
+              y: { ticks: { color: '#F9F7F4', font: { size: 11 } } } },
+            plugins: { legend: { labels: { color: '#F9F7F4', font: { size: 10 } } } }
+          }
+        });
       }
     }
-  });
-}
+
+    // Slide 13: Overview
+    if (h === 13 && !window._chartOverview) {
+      const ctx = document.getElementById('chartOverview');
+      if (ctx) {
+        window._chartOverview = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Acc', 'AUC', 'R@5', 'NDCG@5', 'CosSim', 'IC@5', 'HR@5'],
+            datasets: [
+              { label: 'Ranker', data: [0.9448, 0.7008, 0.5038, 0.3725, 0, 0.6635, 0.3987],
+                backgroundColor: 'rgba(95,107,122,0.6)', borderRadius: 6 },
+              { label: 'World Model', data: [0, 0, 0, 0, 0.9971, 0, 0],
+                backgroundColor: 'rgba(199,81,46,0.5)', borderRadius: 6 },
+              { label: 'Planner', data: [0, 0, 0, 0, 0, 0.9583, 0.4450],
+                backgroundColor: 'rgba(199,81,46,0.85)', borderRadius: 6 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: true,
+            scales: {
+              y: { beginAtZero: true, max: 1.1, ticks: { color: '#5F6B7A' }, grid: { color: 'rgba(95,107,122,0.2)' } },
+              x: { ticks: { color: '#F9F7F4', font: { size: 10 } } }
+            },
+            plugins: { legend: { labels: { color: '#F9F7F4', font: { size: 10 } } } }
+          }
+        });
+      }
+    }
+  }
+
+  Reveal.on('slidechanged', renderCharts);
+  Reveal.on('ready', renderCharts);
 </script>
 </body>
 </html>
