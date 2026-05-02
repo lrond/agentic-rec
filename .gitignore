@@ -28,3 +28,5 @@ artifacts/*
 *.egg
 data/raw/mind/MINDsmall_train/behaviors_train.tsv.gz
 data/raw/
+
+data/processed/news_features_dev.jsonl
