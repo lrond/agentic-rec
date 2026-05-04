@@ -3,13 +3,13 @@
 
 % ── Geometry ──
 \usepackage{geometry}
-\geometry{left=1.8cm,right=1.8cm,top=2.2cm,bottom=2.2cm,columnsep=0.8cm}
+\geometry{left=1.6cm,right=1.6cm,top=2cm,bottom=2cm,columnsep=0.7cm}
 
 % ── Fonts & Typography ──
 \setCJKmainfont{Songti SC}[BoldFont=Heiti SC]
 \setmainfont{Times New Roman}
 \usepackage{setspace}
-\setstretch{1.08}
+\setstretch{1.02}
 
 % ── Packages ──
 \usepackage{graphicx}
@@ -118,32 +118,27 @@ WM 样本（3 步） & 310,338 & 46,792 \\
 
 Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch} 所示。给定用户的浏览历史，系统首先通过 Qwen3-Embedding 将历史新闻编码为语义向量，经加权平均得到用户兴趣状态；GRU 双塔排序器对候选新闻进行初步筛选；Neural ODE 世界模型预测每篇候选新闻对用户兴趣状态的长期影响；Beam Search 规划器结合意图覆盖目标输出 Top-5 推荐列表。
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
-\footnotesize
+\small
 \begin{tikzpicture}[
-    node distance=1.5cm,
-    block/.style={rectangle, draw=copper!60, fill=bg, text width=1.8cm,
-                  text centered, minimum height=0.9cm, font=\scriptsize,
-                  rounded corners=2pt},
-    arrow/.style={->, >=stealth, color=slate, thick},
+    node distance=1.1cm,
+    block/.style={rectangle, draw=copper!50, fill=bg, text width=1.5cm,
+                  text centered, minimum height=0.7cm, font=\scriptsize,
+                  rounded corners=1pt, inner sep=2pt},
+    arrow/.style={->, >=stealth, color=slate!70, line width=0.5pt},
 ]
-\node[block] (qwen) {Qwen3\\Embedding};
-\node[block, right=of qwen] (gru) {GRU\\Ranker};
+\node[block] (qwen) {Qwen3 Embedding};
+\node[block, right=of qwen] (gru) {GRU Ranker};
 \node[block, right=of gru] (ode) {Neural ODE\\World Model};
 \node[block, right=of ode] (beam) {Beam Search\\Planner};
-\node[block, below=0.8cm of beam] (cov) {Coverage\\Reranker};
+\node[block, below=0.6cm of beam] (cov) {Coverage Reranker};
 \draw[arrow] (qwen) -- (gru);
 \draw[arrow] (gru) -- (ode);
 \draw[arrow] (ode) -- (beam);
 \draw[arrow] (beam) -- (cov);
-\node[below=0.15cm of qwen, font=\tiny\color{slate}] {语义编码};
-\node[below=0.15cm of gru, font=\tiny\color{slate}] {候选筛选};
-\node[below=0.15cm of ode, font=\tiny\color{slate}] {状态预测};
-\node[below=0.15cm of beam, font=\tiny\color{slate}] {多步规划};
-\node[above=0.1cm of cov, font=\tiny\color{slate}] {Top-5 输出};
 \end{tikzpicture}
-\caption{Intent-Drift News Planner 系统架构}
+\caption{系统架构：编码 $\to$ 筛选 $\to$ 状态预测 $\to$ 多步规划 $\to$ Top-5 输出}
 \label{fig:arch}
 \end{figure}
 
@@ -286,21 +281,20 @@ HitRate@5 & --- & 44.82\% \\
 
 % ═══════════════════════════════════════════════════════════
 \section{讨论}
-% ═══════════════════════════════════════════════════════════
 
-\subsection{多步预测的价值与局限}
+\subsection{多步预测与 Drift-Aware 训练}
 
-Drift Cosine 从 0.57 到 0.98 的递进趋势是本文最具信息量的实验发现之一。它说明：（1）单次点击对用户兴趣状态的影响信号确实较弱，这与 MIND 数据集低正样本率的特性一致；（2）Neural ODE 能够通过多步 RK4 积分有效累积信号，在三步后以高置信度锁定漂移方向。这验证了连续时间建模在推荐场景中的可行性——即使状态变化微小，正确的方向性预测仍然具有实际价值。
-
-但我们也必须指出 State Cosine 提升的有限性（+0.7\%）。这一现象的根本原因在于加权平均表征的固有平滑性：50 条历史新闻的加权混合使得少数几次新点击对整体状态的影响天然微弱。在 3 步设定下，三个新点击占总权重的约 11\%，而其余 89\% 的分量保持不变。因此，当前的 State Cosine 指标实际上是在一个极窄的动态范围内进行测量。
+Drift Cosine 的递进趋势是本文核心发现之一。恒等映射无法评估漂移方向；纯 MSE 训练的 Neural ODE 在 Step 3 的 Drift Cosine 仅为 0.8712，表明模型在没有显式漂移监督时倾向于学习近似恒等映射；Drift-Aware 训练将这一指标推至 0.9789。更值得注意的是，Drift Cosine 随步数单调递增（0.57$\to$0.80$\to$0.98），说明 Neural ODE 的多步 RK4 积分确实在信号累积中逐步锁定了正确的漂移方向。单步漂移余弦仅 0.57 反映了单次点击信号弱的客观事实，系统通过多步传播克服了这一困难。
 
 \subsection{与现有工作的关联}
 
-Lin 等人~\cite{lin2025interest} 在离散时间步上显式建模了兴趣漂移对序列推荐的影响——本文将这一思想推广为连续时间 Neural ODE，避免了固定时间粒度的假设，可自然处理非均匀时间间隔。Wang 等人~\cite{wang2025intent} 提出超越物品级相似度的意图多样化框架——本文的 Intent Coverage 指标和 Coverage Reranker 是该思想在新闻推荐场景中的直接实现。Chen 等人~\cite{chen2018neural} 的 Neural ODE 框架为本文的连续时间世界模型提供了数学基础。Qwen3-Embedding~\cite{qwen3embedding} 作为冻结编码器为系统提供了高质量的语义表示；MIND 数据集~\cite{wu2020mind} 是实验的基准平台。
+Lin 等人~\cite{lin2025interest} 在离散时间步上显式建模了兴趣漂移——本文将这一思想推广为连续时间 Neural ODE，可自然处理非均匀时间间隔。Wang 等人~\cite{wang2025intent} 提出超越物品级相似度的意图多样化框架——本文的 Intent Coverage 指标与 Coverage Reranker 是其直接实现。Chen 等人~\cite{chen2018neural} 的 Neural ODE 提供了连续时间动态建模的数学基础；Qwen3-Embedding~\cite{qwen3embedding} 提供了冻结语义编码；MIND~\cite{wu2020mind} 是实验基准。
 
-\subsection{局限性与未来工作}
+\subsection{未来工作}
 
-本工作存在以下局限性。首先，世界模型的 State Cosine 受限于加权平均表征——未来可探索学习型状态编码器（如 Transformer 聚合器）或减小历史窗口来提高状态灵敏度。其次，多步世界模型的数据量仅为单步的 16\%，且来源局限于同一 impression 内的点击——未来可利用 MIND 的跨曝光时序数据（同一用户在不同时间点的多次 impression）构建更长的兴趣演化链。第三，Planner 的评估受限于 200 个 impression（Beam Search 推理开销），更大规模的评估可提供更稳定的统计结论。第四，当前仅在 MINDsmall 子集上实验，大型数据集上的泛化性有待验证。
+本文的发现为若干改进方向提供了明确的动机。首先，加权平均表征的平滑性提示我们可探索更具区分度的状态编码器。潜在方案包括：（1）将历史窗口从 50 减小至 10--20，使新点击的权重占比从 11\% 提升至 25--35\%；（2）用可学习的 Transformer 聚合器替代固定的加权平均，让模型自行学习如何从历史中构建状态表征；（3）使用最后一条状态而非全局加权平均，使状态更灵敏地响应最近行为。这些改变需要同步调整 Ranker 的训练以保持一致性。
+
+其次，当前多步世界模型仅使用同一 impression 内的连续点击序列，数据量仅为单步的 16\%。MIND 数据集包含同一用户跨多个时间点的 impression 记录，利用这些跨曝光的时序数据可构建更长的兴趣演化链，既缓解数据稀疏性，又更贴近真实的兴趣漂移过程。第三，Planner 的 Beam Search 推理开销可通过模型蒸馏或剪枝优化，以支持更大规模的评估。第四，在 MINDlarge 等更大数据集上验证泛化性也是自然的后续方向。
 
 % ═══════════════════════════════════════════════════════════
 \section{结论}
