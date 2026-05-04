@@ -125,17 +125,15 @@ WM 样本（$N=3$） & 310,338 & 46,792 \\
 
 系统采用四阶段流水线（图~\ref{fig:arch}）。给定浏览历史，Qwen3 将新闻编码为语义向量，加权平均得到用户状态；GRU 排序器筛选候选；Neural ODE 预测每篇候选对状态的长期影响；Beam Search 结合意图覆盖输出 Top-5。
 
-\begin{figure}[ht]
-\centering
+\begin{center}
 \footnotesize
 \begin{tikzpicture}[
-    node distance=0.7cm and 0.5cm,
-    block/.style={rectangle,draw=copper!50,fill=bg,text width=2.2cm,
-                  text centered,minimum height=0.6cm,font=\scriptsize,
+    node distance=0.55cm and 0.4cm,
+    block/.style={rectangle,draw=copper!50,fill=bg,text width=2.1cm,
+                  text centered,minimum height=0.55cm,font=\scriptsize,
                   rounded corners=1pt,inner sep=2pt},
-    arrow/.style={->,>=stealth,color=slate!70,line width=0.4pt},
+    arrow/.style={->,>=stealth,color=slate!70,line width=0.3pt},
 ]
-% Top row: 4 modules
 \node[block] (qwen) {Qwen3 Embedding};
 \node[block,right=of qwen] (gru) {GRU Ranker};
 \node[block,right=of gru] (ode) {Neural ODE\\World Model};
@@ -143,14 +141,13 @@ WM 样本（$N=3$） & 310,338 & 46,792 \\
 \draw[arrow] (qwen) -- (gru);
 \draw[arrow] (gru) -- (ode);
 \draw[arrow] (ode) -- (beam);
-% Bottom row: reranker
-\node[block,below=0.5cm of beam] (cov) {Coverage Reranker};
+\node[block,below=0.45cm of beam] (cov) {Coverage Reranker};
 \draw[arrow] (beam) -- (cov);
-\node[right=0.3cm of cov,font=\scriptsize] {$\to$ Top-5};
+\node[right=0.2cm of cov,font=\scriptsize] {$\to$ Top-5};
 \end{tikzpicture}
-\caption{系统架构：编码 $\to$ 排序 $\to$ 状态预测 $\to$ 规划 $\to$ 重排输出}
+\captionof{figure}{系统架构：编码 $\to$ 排序 $\to$ 状态预测 $\to$ 规划 $\to$ 重排}
 \label{fig:arch}
-\end{figure}
+\end{center}
 
 \subsection{语义编码}
 
@@ -210,6 +207,7 @@ ILS@5 & 0.579 \\
 
 排序器达到 94.48\% 准确率和 0.701 AUC，Recall@5 为 50.75\%。IC@5 仅 66.53\% 说明仅凭相关性打分不足以覆盖多元兴趣——这正是规划器的切入点。ILS@5 为 0.579 反映了相关性排序导致的列表内冗余。
 
+\clearpage
 \subsection{世界模型漂移预测}
 
 我们在 46,792 条多步样本上进行三方对比（表~\ref{tab:wm}）。恒等映射的 State Cosine 为 0.9857，是系统下限。纯 MSE 训练的 Neural ODE 将 State Cosine 推至 0.9968——但这实为退化：模型学习近似恒等映射。证据是其 Drift Cosine 仅 0.8712。
