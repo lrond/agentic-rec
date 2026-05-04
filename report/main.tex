@@ -97,7 +97,7 @@ MIND~\cite{wu2020mind} 是新闻推荐领域广泛使用的基准数据集，由
 
 \subsection{数据统计}
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \caption{数据集统计}
 \label{tab:data}
@@ -189,7 +189,7 @@ WM 样本（$N=3$） & 310,338 & 46,792 \\
 
 \subsection{Ranker 性能}
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \caption{GRU 双塔排序器（2,000 impressions）}
 \label{tab:ranker}
@@ -217,7 +217,7 @@ ILS@5 & 0.579 \\
 
 Drift-Aware 训练牺牲了部分 State 精度（Cosine 降至 0.9927），换来了漂移方向预测的显著提升：Step 3 的 Drift Cosine 从 0.8712 跃升至 0.9789，且每一步均高于纯 MSE 基线。Drift Cosine 的递进趋势（0.57 $\to$ 0.80 $\to$ 0.98）验证了多步 RK4 积分的信号累积能力。
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \caption{世界模型三方对比（3 步，46,792 样本）}
 \label{tab:wm}
@@ -239,7 +239,7 @@ State MSE & $7.5\!\times\!10^{-5}$ & $1.5\!\times\!10^{-5}$ & $3.7\!\times\!10^{
 
 \subsection{规划器意图覆盖}
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \caption{Ranker vs Planner（2,000 impressions）}
 \label{tab:planner}
