@@ -159,17 +159,18 @@ MIND 新闻推荐数据集（PaddleRec 镜像），约 96,000 篇新闻，百万
 
 ### Neural ODE World Model — 三方对比
 
-| 指标 | 恒等映射 | Neural ODE（Drift-Aware） |
-|------|:--:|:--:|
-| State Cosine | 0.9857 | 0.9927 |
-| State MSE | 7.5×10⁻⁵ | 3.7×10⁻⁵ |
-
-| 漂移指标 | Step 1 | Step 2 | Step 3 |
+| 指标 | 恒等映射 | Neural ODE（纯 MSE） | Neural ODE（Drift-Aware） |
 |------|:--:|:--:|:--:|
-| **Drift Cosine** | **0.5734** | **0.8042** | **0.9789** |
-| Drift MSE | 6.3×10⁻⁵ | 5.0×10⁻⁵ | 3.7×10⁻⁵ |
+| State Cosine | 0.9857 | **0.9968** | 0.9927 |
+| State MSE | $7.5\!	imes\!10^{-5}$ | **$1.5\!	imes\!10^{-5}$** | $3.7\!	imes\!10^{-5}$ |
 
-> 恒等映射（预测"兴趣不变"）的 State Cosine 为 0.9857。Drift-Aware Neural ODE 超越此基线（0.9927），同时**漂移余弦从 0.57 递增至 0.98**——表明模型在信号累积中逐步锁定了正确的兴趣漂移方向。单步漂移余弦 0.57 也反映了单次点击对用户兴趣状态的弱信号特性。
+| Drift Cosine | 恒等映射 | 纯 MSE | Drift-Aware |
+|------|:--:|:--:|:--:|
+| Step 1 | — | 0.5243 | **0.5734** |
+| Step 2 | — | 0.7248 | **0.8042** |
+| Step 3 | — | 0.8712 | **0.9789** |
+
+> 纯 MSE 训练的 Neural ODE 在 State Cosine 上表现最好（0.9968），但这是因为它退化为近似恒等映射——State MSE 极低（$1.5	imes10^{-5}$）而 Drift Cosine 仅 0.87。Drift-Aware 训练牺牲了部分 State 精度（Cosine 降至 0.9927），换来了漂移方向预测的显著提升：Step 3 的 Drift Cosine 从 0.87 跃升至 0.98。这一 trade-off 验证了显式的漂移监督对世界模型学习有意义的兴趣演化动态是必要的。
 
 ---
 

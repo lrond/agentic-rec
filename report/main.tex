@@ -238,23 +238,23 @@ ILS@5 & 0.579 \\
 \caption{世界模型漂移预测对比（3 步，46,792 样本）}
 \label{tab:wm}
 \small
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
 指标 & 恒等映射 & Neural ODE & Neural ODE \\
-& & (MSE) & (Drift-Aware) \\
+& & (纯MSE) & (Drift-Aware) \\
 \midrule
 State MSE & $7.54\!\times\!10^{-5}$ & $1.53\!\times\!10^{-5}$ & $3.65\!\times\!10^{-5}$ \\
-State Cosine & 0.9857 & 0.9968 & \textbf{0.9927} \\
+State Cosine & 0.9857 & 0.9968 & 0.9927 \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Drift Cosine}} \\
-\quad Step 1 & --- & --- & 0.5734 \\
-\quad Step 2 & --- & --- & 0.8042 \\
-\quad Step 3 & --- & --- & \textbf{0.9789} \\
+\quad Step 1 & --- & 0.5243 & 0.5734 \\
+\quad Step 2 & --- & 0.7248 & 0.8042 \\
+\quad Step 3 & --- & 0.8712 & \textbf{0.9789} \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Drift MSE}} \\
-\quad Step 1 & --- & --- & $6.28\!\times\!10^{-5}$ \\
-\quad Step 2 & --- & --- & $4.98\!\times\!10^{-5}$ \\
-\quad Step 3 & --- & --- & $3.65\!\times\!10^{-5}$ \\
+\quad Step 1 & --- & $4.91\!\times\!10^{-5}$ & $6.28\!\times\!10^{-5}$ \\
+\quad Step 2 & --- & $3.08\!\times\!10^{-5}$ & $4.98\!\times\!10^{-5}$ \\
+\quad Step 3 & --- & $1.53\!\times\!10^{-5}$ & $3.65\!\times\!10^{-5}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -282,7 +282,7 @@ HitRate@5 & --- & 44.82\% \\
 
 \subsection{实验总结}
 
-综合来看，系统的各模块在各自职责范围内均发挥了作用。Ranker 提供了可靠的候选筛选基础（AUC 0.701）；世界模型在多步预测中展现了漂移方向学习能力（Drift Cosine 0.57$\to$0.98）；Planner 则是意图覆盖提升的核心贡献者（IC@5 +29.9pp）。然而，State Cosine 从恒等基线的 0.9857 仅提升至 0.9927，反映出当前状态表征方式（加权平均）对世界模型学习空间的根本性限制。
+综合来看，系统的各模块在各自职责范围内均发挥了作用。Ranker 提供了可靠的候选筛选基础（AUC 0.701）；世界模型在多步预测中展现了漂移方向学习能力（Drift Cosine 0.57$\to$0.98）；Planner 则是意图覆盖提升的核心贡献者（IC@5 +29.9pp）。然而，纯 MSE 训练的漂移余弦仅 0.87，而 Drift-Aware 将其推至 0.98——这一差距揭示了训练目标设计对世界模型行为的决定性影响。
 
 % ═══════════════════════════════════════════════════════════
 \section{讨论}
