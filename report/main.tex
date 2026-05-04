@@ -144,46 +144,86 @@ Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch}
 
 \subsection{语义编码}
 
-采用 Qwen3-Embedding-0.6B~\cite{qwen3embedding} 作为冻结编码器。对于每篇新闻，将标题和摘要拼接后输入模型，取最后一层隐藏状态的均值池化作为 256 维语义向量。编码后的向量经 L2 归一化，以 NPZ 格式（96K$\times$256 的 float32 矩阵 + ID 列表）存储，供后续模块按新闻 ID 查表使用。该步骤在数据预处理阶段执行一次，训练和推理阶段仅需查表，不产生额外计算开销。
+新闻文本的语义表示是整个系统的输入基础。我们采用 Qwen3-Embedding-0.6B~\cite{qwen3embedding} 作为冻结编码器，该模型在 MTEB 多语言基准上取得了领先性能，且 0.6B 参数量在推理效率与表示质量之间取得了良好平衡。对于每篇新闻，将标题和摘要以空格拼接后输入模型，取最后一层隐藏状态在所有 token 上的均值池化，经线性投影得到 256 维语义向量。所有 96,074 篇新闻的向量经 L2 归一化后以 NPZ 格式存储（一个 $96074\times 256$ 的 float32 矩阵和对应的 ID 列表，共 72 MB），供后续模块按新闻 ID 通过 $O(1)$ 查表使用。
+
+选择冻结而非微调编码器有三方面考虑：其一，Qwen3-Embedding 已在大规模语料上预训练，其语义空间具有足够的泛化性；其二，冻结编码避免了在下游任务上过拟合新闻文本的特定分布；其三，编码过程仅需在数据预处理阶段执行一次，训练和推理阶段均不产生额外的模型前向计算，显著降低了系统的整体计算开销。
 
 \subsection{GRU 双塔排序器}
 
-排序器采用双塔结构。用户塔：将最近 50 条浏览历史的嵌入序列输入单层 GRU（隐藏维度 256），取最后时间步的输出作为用户兴趣向量。新闻塔：直接使用候选新闻的 Qwen3 嵌入向量。双塔输出的余弦相似度经线性层和 sigmoid 函数映射为点击概率。训练使用二元交叉熵损失，优化器为 AdamW（学习率 $10^{-3}$），batch size 256，训练 10 个 epoch。排序器在推理阶段对候选池中的所有新闻打分，取 Top-$K$ 高分候选传递给规划器。
+排序器负责从候选池中快速筛选出与用户兴趣相关的高质量候选，是后续规划器的基础。我们采用经典的双塔结构，将用户表征和新闻表征解耦为两个独立的编码路径。
+
+\textbf{用户塔。}输入为最近 50 条浏览历史的 Qwen3 嵌入序列。我们使用单层 GRU（隐藏维度 256）对序列进行时序建模——GRU 的门控机制能够自适应地保留长期兴趣信息，同时捕捉最近的阅读偏好变化。取 GRU 最后时间步的隐藏状态作为 256 维的用户兴趣向量 $\mathbf{h}_u$。
+
+\textbf{新闻塔。}新闻塔不使用额外的编码器，直接取候选新闻的 Qwen3 嵌入向量 $\mathbf{e}_v$。这一设计有两个优势：一是避免了重复编码的计算开销；二是让用户塔和新闻塔共享同一个语义空间，使相似度计算更具可解释性。
+
+\textbf{预测与训练。}双塔输出的余弦相似度 $\cos(\mathbf{h}_u, \mathbf{e}_v)$ 经过一个可学习的线性变换和 sigmoid 激活后输出点击概率 $\hat{y} \in [0, 1]$。训练使用二元交叉熵损失，优化器为 AdamW（学习率 $10^{-3}$，权重衰减 $10^{-4}$），batch size 256，共训练 10 个 epoch。在全量 950 万训练样本上，排序器的训练 loss 从 0.457 收敛至 0.437。
+
+\textbf{推理。}推理阶段，用户塔对当前用户进行一次编码得到 $\mathbf{h}_u$，然后对候选池中的所有新闻计算 $\cos(\mathbf{h}_u, \mathbf{e}_v)$，取 Top-$K$ 高分候选传递给规划器。双塔结构使得新闻塔可以预计算并缓存所有新闻的嵌入，推理时仅需一次用户编码和若干次点积运算，效率极高。
 
 \subsection{Neural ODE 世界模型}
 
-世界模型的核心是预测推荐行为对用户兴趣状态的影响。我们采用 Neural ODE 建模连续时间状态演化：
+世界模型是系统的核心创新之一，其任务是预测推荐行为对用户兴趣状态的长期影响。与传统的离散时间步状态转移模型不同，我们将兴趣演化建模为连续时间动态系统。这一选择的动机在于：用户的阅读兴趣并非在固定时间点跳跃，而是在两次点击之间连续地漂移——Neural ODE 的连续时间框架天然适合描述这一过程。
+
+\textbf{连续时间动态建模。}形式化地，我们将状态演化定义为一个常微分方程初值问题：
 \begin{equation}
-\frac{d\mathbf{u}}{dt} = f_\theta(\mathbf{u}, \mathbf{a})
+\frac{d\mathbf{u}}{dt} = f_\theta(\mathbf{u}, \mathbf{a}), \quad \mathbf{u}(0) = \mathbf{u}_t
 \label{eq:ode}
 \end{equation}
-其中 $\mathbf{u} \in \mathbf{R}^{256}$ 为用户状态向量，$\mathbf{a} \in \mathbf{R}^{256}$ 为推荐新闻的嵌入向量。$f_\theta$ 是一个包含两个 512 维隐藏层、ReLU 激活的多层感知机。状态积分采用四阶 Runge-Kutta 方法（RK4），每步以 4 个子步进行数值积分。
+其中 $\mathbf{u}(t) \in \mathbf{R}^{256}$ 为时变状态向量，$\mathbf{a} \in \mathbf{R}^{256}$ 为推荐新闻的嵌入向量（在积分区间内视为常数），$f_\theta$ 为神经网络参数化的向量场。$f_\theta$ 的结构为一个包含两个 512 维隐藏层的多层感知机，层间使用 ReLU 激活函数。输入为状态和动作的拼接 $[\mathbf{u}; \mathbf{a}] \in \mathbf{R}^{512}$，输出为同维度的导数 $\frac{d\mathbf{u}}{dt}$。
 
-\textbf{多步预测。}在训练和评估阶段，世界模型接受初始状态 $\mathbf{u}_t$ 和一个动作序列 $[\mathbf{a}_1, \mathbf{a}_2, \mathbf{a}_3]$，依次执行三次 RK4 积分：$\mathbf{u}_{t+1} = \text{RK4}(\mathbf{u}_t, \mathbf{a}_1)$，$\mathbf{u}_{t+2} = \text{RK4}(\mathbf{u}_{t+1}, \mathbf{a}_2)$，$\mathbf{u}_{t+3} = \text{RK4}(\mathbf{u}_{t+2}, \mathbf{a}_3)$。最终与目标状态 $\mathbf{u}_{t+3}$（包含全部三个点击后的加权平均状态）进行比较。
-
-\textbf{Drift-Aware 训练。}传统的 MSE 损失对状态预测任务过于宽容——由于加权平均表征具有高度平滑性，模型仅需学习近似恒等映射即可获得极低的 MSE。为解决这一问题，我们提出 Drift-Aware 训练目标，将损失函数分解为状态级和漂移级两部分：
+\textbf{数值积分。}我们采用经典的四阶 Runge-Kutta 方法（RK4）对式~\eqref{eq:ode} 进行数值求解。RK4 每步执行 4 次向量场评估，以 $\mathcal{O}(h^5)$ 的局部截断误差收敛，在精度和计算效率之间取得了良好平衡。具体地，给定当前状态 $\mathbf{u}$ 和动作 $\mathbf{a}$，一步 RK4 积分为：
 \begin{equation}
 \begin{aligned}
-\mathcal{L} &= \mathcal{L}_{\text{state}} + \mathcal{L}_{\text{drift}} \\
-&+ 0.5 \cdot \mathcal{L}_{\text{cos-state}} + \mathcal{L}_{\text{cos-drift}}
+\mathbf{k}_1 &= f_\theta(\mathbf{u}, \mathbf{a}) \\
+\mathbf{k}_2 &= f_\theta(\mathbf{u} + \tfrac{h}{2}\mathbf{k}_1, \mathbf{a}) \\
+\mathbf{k}_3 &= f_\theta(\mathbf{u} + \tfrac{h}{2}\mathbf{k}_2, \mathbf{a}) \\
+\mathbf{k}_4 &= f_\theta(\mathbf{u} + h\mathbf{k}_3, \mathbf{a}) \\
+\mathbf{u}_{\text{next}} &= \mathbf{u} + \tfrac{h}{6}(\mathbf{k}_1 + 2\mathbf{k}_2 + 2\mathbf{k}_3 + \mathbf{k}_4)
+\end{aligned}
+\label{eq:rk4}
+\end{equation}
+其中步长 $h=1.0$，共执行 4 个子步。在 Beam Search 的每次候选评估中均需调用一次 RK4 积分（共约 88 次/impression）。
+
+\textbf{多步预测。}在训练和评估阶段，世界模型接受初始状态 $\mathbf{u}_t$ 和一个连续动作序列 $[\mathbf{a}_1, \mathbf{a}_2, \mathbf{a}_3]$（来自同一 impression 的三个连续点击），依次执行三次 RK4 积分：
+\begin{equation}
+\mathbf{u}_{t+k} = \text{RK4}(\mathbf{u}_{t+k-1}, \mathbf{a}_k), \quad k = 1, 2, 3
+\label{eq:multistep}
+\end{equation}
+最终预测 $\hat{\mathbf{u}}_{t+3}$ 与真实目标 $\mathbf{u}_{t+3}$（加入全部三个点击后的加权平均状态）进行比较并计算损失。多步机制使得梯度信号能够跨时间步反向传播，模型需要学习跨越多个点击的长期状态转移规律。
+
+\textbf{Drift-Aware 训练。}在上述框架下，一个关键问题是训练目标的设计。传统的均方误差（MSE）损失对状态预测任务过于宽容：当用户状态通过 50 条历史的加权平均构建时，少数几次新点击对整体状态的影响天然微弱——极限情况下，恒等映射（$\hat{\mathbf{u}}_{t+3} = \mathbf{u}_t$）即可达到 0.9857 的 State Cosine。因此，纯 MSE 训练的模型缺乏动力去学习真实的状态演化动态。
+
+为解决这一问题，我们提出 Drift-Aware 训练目标，显式地将损失函数分解为状态级和漂移级两部分，对漂移分量的学习给予更强的监督信号：
+\begin{equation}
+\begin{aligned}
+\mathcal{L} &= \underbrace{\text{MSE}(\hat{\mathbf{u}}_{t+3}, \mathbf{u}_{t+3})}_{\mathcal{L}_{\text{state}}}
++ \underbrace{\text{MSE}(\Delta\hat{\mathbf{u}}, \Delta\mathbf{u})}_{\mathcal{L}_{\text{drift}}} \\
+&+ 0.5 \cdot \underbrace{(1 - \cos(\hat{\mathbf{u}}_{t+3}, \mathbf{u}_{t+3}))}_{\mathcal{L}_{\text{cos-state}}}
++ \underbrace{(1 - \cos(\Delta\hat{\mathbf{u}}, \Delta\mathbf{u}))}_{\mathcal{L}_{\text{cos-drift}}}
 \end{aligned}
 \label{eq:loss}
 \end{equation}
-其中 $\mathcal{L}_{\text{state}}$ 为预测状态与真实状态的 MSE，$\mathcal{L}_{\text{drift}}$ 为预测漂移 $\Delta\hat{\mathbf{u}} = \hat{\mathbf{u}}_{t+n} - \mathbf{u}_t$ 与真实漂移 $\Delta\mathbf{u} = \mathbf{u}_{t+n} - \mathbf{u}_t$ 的 MSE，$\mathcal{L}_{\text{cos-state}}$ 为状态级余弦损失，$\mathcal{L}_{\text{cos-drift}}$ 为漂移方向的余弦损失。漂移级损失的加入迫使模型学习状态变化的方向和幅度，而非简单地输出近似恒等映射。模型训练 10 个 epoch，batch size 256，AdamW 优化器（学习率 $10^{-3}$）。
+其中 $\Delta\hat{\mathbf{u}} = \hat{\mathbf{u}}_{t+3} - \mathbf{u}_t$ 为预测漂移，$\Delta\mathbf{u} = \mathbf{u}_{t+3} - \mathbf{u}_t$ 为真实漂移。$\mathcal{L}_{\text{drift}}$ 惩罚漂移幅度的偏差，$\mathcal{L}_{\text{cos-drift}}$ 惩罚漂移方向的偏差——后者尤为关键，因为方向正确性比幅度精度对下游规划更具价值。模型训练 10 个 epoch，batch size 256，AdamW 优化器（学习率 $10^{-3}$），最终复合 loss 从 0.089 收敛至 0.023。
 
 \subsection{Beam Search 规划器}
 
-规划器以 Beam Search 为核心（见图~\ref{fig:arch} 下半部分）。从前瞻 horizon=3 轮展开搜索：初始时只有一条路径（当前用户状态）；每轮对所有活跃路径展开 branching\_factor=8 个最高分候选，调用世界模型预测选择每条候选后的未来状态，计算综合奖励；保留 beam\_width=5 条最优路径进入下一轮。奖励函数综合考虑五个因素：
+规划器是系统意图覆盖能力的核心来源。它以 Beam Search 为搜索框架，在世界模型预测的未来状态空间中展开多步前瞻搜索，寻找兼顾即时相关性和长期兴趣覆盖的推荐序列。
+
+\textbf{搜索过程。}Beam Search 从当前用户状态 $\mathbf{u}_t$ 出发，在 horizon=3 轮内展开搜索。初始时仅有一条活跃路径（当前状态，空推荐列表）。每轮对每条活跃路径：首先调用 Ranker 从剩余候选池中选出 branching\_factor=8 个最高分候选；然后对每个候选调用世界模型的 RK4 积分，预测选择该候选后的未来状态；最后计算综合奖励。所有展开结果中，保留 beam\_width=5 条累计奖励最高的路径进入下一轮。三轮搜索后，选择奖励最高的路径作为规划结果。总计约 88 次世界模型调用（第 1 轮 $1\times 8$，第 2--3 轮 $5\times 8$）。
+
+\textbf{奖励函数。}每条候选的奖励由五项因素加权求和：
 
 \begin{enumerate}[nosep]
-\item 相关性（Ranker 得分，权重 1.0）
-\item 漂移增益（状态变化幅度，权重 0.35）
-\item 意图覆盖（新增类别获额外奖励，权重 0.8）
-\item 长期对齐（状态与候选新闻的余弦相似度，权重 0.3）
-\item 类别多样性（惩罚过度集中于某一类别，权重 0.15）
+\item \textbf{相关性}（权重 1.0）：Ranker 对该候选的预测点击概率，保证推荐的即时质量。
+\item \textbf{漂移增益}（权重 0.35）：选择该候选后状态变化的 $L_2$ 范数 $\|\mathbf{u}_{\text{next}} - \mathbf{u}_{\text{current}}\|$。适度的漂移表明新闻对用户产生了实质性影响，过小的漂移意味着推荐了用户已充分接触的内容。
+\item \textbf{意图覆盖}（权重 0.8）：若候选的类别尚未出现在当前路径的推荐列表中，给予额外奖励。这一机制直接鼓励 Beam Search 探索多样化类别，是实现意图覆盖率提升的关键设计。
+\item \textbf{长期对齐}（权重 0.3）：预测的未来状态与候选新闻自身的余弦相似度 $\cos(\mathbf{u}_{\text{next}}, \mathbf{e}_{\text{item}})$。该项奖励路径终点状态与所选新闻内容的一致性，避免漂移后的状态与推荐内容脱节。
+\item \textbf{类别多样性}（权重 0.15）：对当前路径中各类别的分布进行监测，若某类别占比过高，降低同类别后续候选的奖励。该项作为意图覆盖的补充，防止 Beam Search 在探索新类别后迅速回到主导类别。
 \end{enumerate}
 
-最终通过 Coverage Reranker 对最优路径上的候选进行贪心类别去重：已有某类新闻则优先选择其他类别，确保 Top-5 推荐覆盖多样化的兴趣领域。
+这五项因素的权重分配体现了系统的核心设计理念：相关性（1.0）保持推荐的基本质量，意图覆盖（0.8）推动多样性探索，漂移增益（0.35）和长期对齐（0.3）确保世界模型预测的准确性，类别多样性（0.15）作为细粒度的分布控制。
+
+\textbf{Coverage Reranker。}Beam Search 返回的最优路径可能仍存在类别冗余（例如路径上连续两条新闻同属 sports 类）。Coverage Reranker 以贪心策略对最优路径上的候选进行类别去重：从路径起点的候选开始，维护一个已选类别集合；对于后续候选，若其类别已存在于集合中，则跳过并从剩余候选中选择类别不同的最高分替代；若所有候选的类别均已覆盖，则保留原候选。这一后处理步骤确保了最终 Top-5 推荐列表在保持 Beam Search 优化质量的同时，最大化意图覆盖。
 
 % ═══════════════════════════════════════════════════════════
 \section{实验}
