@@ -202,7 +202,7 @@ make eval-wm-multi WORLD_MODEL_N_STEPS=3
 make eval-planner MAX_DEV_IMPRESSIONS=2000
 ```
 
-> `MAX_DEV_IMPRESSIONS=0` 使用全量验证集（192K impressions），设为 `5000` 使用 5K 采样以加速评估。
+> `eval-all` 自动包含恒等映射基线和漂移指标对比。`MAX_DEV_IMPRESSIONS=0` 使用全量验证集（192K impressions），设为 `5000` 使用 5K 采样以加速评估。
 
 **环境**：Python ≥ 3.11 · PyTorch ≥ 2.3 · Qwen3-Embedding-0.6B · NVIDIA RTX 5090
 
