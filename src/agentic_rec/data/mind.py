@@ -224,6 +224,7 @@ def prepare_mind_split(
     seed: int,
     max_behaviors: int | None = None,
     embedding_config: SemanticEmbeddingConfig | None = None,
+    world_model_n_steps: int = 1,
 ) -> dict[str, int]:
     rng = random.Random(f"{seed}-{split_name}")
     output_dir = Path(output_root)
@@ -291,19 +292,38 @@ def prepare_mind_split(
                 counters["ranker_examples"] += 1
 
             clicked_ids = [news_id for news_id, label in filtered_impressions if label == 1]
-            for clicked_id in clicked_ids:
-                json.dump(
-                    {
-                        "impression_id": behavior.impression_id,
-                        "user_id": behavior.user_id,
-                        "history_ids": [nid for nid in behavior.history_ids if nid in news_map][-history_size:],
-                        "clicked_id": clicked_id,
-                        "category": news_map[clicked_id].category,
-                    },
-                    world_model_handle,
-                    ensure_ascii=False,
-                )
-                world_model_handle.write("\n")
-                counters["world_model_examples"] += 1
+            if world_model_n_steps <= 1:
+                # Single-step: one row per clicked article
+                for clicked_id in clicked_ids:
+                    json.dump(
+                        {
+                            "impression_id": behavior.impression_id,
+                            "user_id": behavior.user_id,
+                            "history_ids": [nid for nid in behavior.history_ids if nid in news_map][-history_size:],
+                            "clicked_id": clicked_id,
+                            "category": news_map[clicked_id].category,
+                        },
+                        world_model_handle,
+                        ensure_ascii=False,
+                    )
+                    world_model_handle.write("\n")
+                    counters["world_model_examples"] += 1
+            else:
+                # Multi-step: one row per N consecutive clicks within the impression
+                for start in range(0, len(clicked_ids) - world_model_n_steps + 1):
+                    step_ids = clicked_ids[start:start + world_model_n_steps]
+                    json.dump(
+                        {
+                            "impression_id": behavior.impression_id,
+                            "user_id": behavior.user_id,
+                            "history_ids": [nid for nid in behavior.history_ids if nid in news_map][-history_size:],
+                            "clicked_ids": step_ids,
+                            "categories": [news_map[cid].category for cid in step_ids],
+                        },
+                        world_model_handle,
+                        ensure_ascii=False,
+                    )
+                    world_model_handle.write("\n")
+                    counters["world_model_examples"] += 1
 
     return counters

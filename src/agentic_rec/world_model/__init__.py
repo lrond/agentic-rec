@@ -8,6 +8,7 @@ __all__ = [
     "load_checkpoint",
     "save_checkpoint",
     "train_world_model_epoch",
+    "train_world_model_epoch_multi_step",
 ]
 
 
@@ -15,6 +16,7 @@ def __getattr__(name: str):
     if name in {
         "NeuralODEWorldModel",
         "train_world_model_epoch",
+        "train_world_model_epoch_multi_step",
         "save_checkpoint",
         "load_checkpoint",
     }:

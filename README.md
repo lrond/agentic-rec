@@ -130,12 +130,13 @@ MIND 新闻推荐数据集（PaddleRec 镜像），约 96,000 篇新闻，百万
 
 | | 训练集 | 验证集 |
 |------|------|------|
-| 原始 behavior 数 | 156,965 | 73,025 |
-| 实际使用样本 | 500K（随机采样, seed=42） | 5K impressions（完整候选保留） |
+| 原始 behavior 数 | 1,286,316 | 192,476 |
+| Ranker 样本 | 950 万（全量） | 750 万（全量） |
+| World Model 样本 | 31 万（3 步多步） | 4.7 万（3 步多步） |
 | 负采样 | 每条正例最多 4 条负例 | 保留全部负例 |
 | 存储 | JSONL（ID）+ .npz（72MB 嵌入矩阵） | 同左 |
 
-> 验证集采用 impression 级采样——保留每个曝光的完整候选池，确保 Recall@5、NDCG@5 等分组指标有效计算。
+> 验证集评估默认使用 **2,000 impressions 随机采样**（`MAX_DEV_IMPRESSIONS=2000`），平衡速度与稳定性。设为 `0` 可评估全量 192K impressions。
 
 详见 [`DATA.md`](DATA.md)。
 
@@ -143,23 +144,32 @@ MIND 新闻推荐数据集（PaddleRec 镜像），约 96,000 篇新闻，百万
 
 ## 实验结果
 
+以下结果基于 **2,000 impressions 随机采样**（`MAX_DEV_IMPRESSIONS=2000`），全量训练数据。World Model 采用 **Drift-Aware 训练**（联合优化 MSE + 漂移 MSE + 漂移 Cosine）。
+
 ### Ranker 与 Planner
 
 | 指标 | Ranker-only | + Planner | 变化 |
 |------|:---------:|:--------:|:----:|
 | Accuracy | 94.48% | — | — |
 | AUC | 0.701 | — | — |
-| Recall@5 | 50.38% | — | — |
-| Coverage@5 | 66.35% | **95.83%** | ↑ 44% |
-| ILS@5（越低越多样） | 0.578 | 0.527 | ↓ 9% |
-| HitRate@5 | — | 44.50% | — |
+| Recall@5 | 50.75% | — | — |
+| **Coverage@5** | **66.53%** | **96.40%** | ↑ **30pp** |
+| ILS@5（越低越多样） | 0.579 | 0.527 | ↓ 9% |
+| HitRate@5 | — | **44.82%** | — |
 
-### World Model
+### Neural ODE World Model — 三方对比
 
-| 指标 | 值 |
-|------|------|
-| Neural ODE MSE | 1.52 × 10⁻⁵ |
-| Cosine Similarity | 99.71% |
+| 指标 | 恒等映射 | Neural ODE（Drift-Aware） |
+|------|:--:|:--:|
+| State Cosine | 0.9857 | 0.9927 |
+| State MSE | 7.5×10⁻⁵ | 3.7×10⁻⁵ |
+
+| 漂移指标 | Step 1 | Step 2 | Step 3 |
+|------|:--:|:--:|:--:|
+| **Drift Cosine** | **0.5734** | **0.8042** | **0.9789** |
+| Drift MSE | 6.3×10⁻⁵ | 5.0×10⁻⁵ | 3.7×10⁻⁵ |
+
+> 恒等映射（预测"兴趣不变"）的 State Cosine 为 0.9857。Drift-Aware Neural ODE 超越此基线（0.9927），同时**漂移余弦从 0.57 递增至 0.98**——表明模型在信号累积中逐步锁定了正确的兴趣漂移方向。单步漂移余弦 0.57 也反映了单次点击对用户兴趣状态的弱信号特性。
 
 ---
 
@@ -168,15 +178,31 @@ MIND 新闻推荐数据集（PaddleRec 镜像），约 96,000 篇新闻，百万
 ```bash
 pip install -e '.[train]'
 
-# 数据预处理
-make data
+# 数据预处理（N_STEPS=3 生成多步世界模型数据）
+make data N_STEPS=3
 
-# 训练（Ranker + Neural ODE）
-make train
+# 训练（Ranker + Neural ODE 世界模型）
+make train N_STEPS=3
 
-# 评测
-make eval
+# ── 评测（4 种独立模式）──
+
+# 完整管线：Ranker + World Model + Planner
+make eval-all MAX_DEV_IMPRESSIONS=2000
+
+# 仅 Ranker：分类指标 + Top-K 意图覆盖
+make eval-ranker MAX_DEV_IMPRESSIONS=2000
+
+# 仅 World Model 单步预测：state → 1 click
+make eval-wm
+
+# 仅 World Model 多步预测：state → N clicks（误差累积）
+make eval-wm-multi WORLD_MODEL_N_STEPS=3
+
+# 仅 Planner：Beam Search + Coverage Reranker
+make eval-planner MAX_DEV_IMPRESSIONS=2000
 ```
+
+> `MAX_DEV_IMPRESSIONS=0` 使用全量验证集（192K impressions），设为 `5000` 使用 5K 采样以加速评估。
 
 **环境**：Python ≥ 3.11 · PyTorch ≥ 2.3 · Qwen3-Embedding-0.6B · NVIDIA RTX 5090
 
@@ -228,5 +254,5 @@ make eval
 
 1. Wu et al. *MIND: A Large-scale Dataset for News Recommendation.* ACL 2020.
 2. Qwen Team. *Qwen3 Embedding: Technical Report.* arXiv:2506.05176, 2025.
-3. Wang et al. *Towards Interest Drift-driven User Representation Learning.* SIGIR 2025.
-4. Wang et al. *Beyond Item Dissimilarities: Intent-level Diversity in Recommendation.* KDD 2025.
+3. Lin et al. *Towards Interest Drift-driven User Representation Learning in Sequential Recommendation.* SIGIR 2025.
+4. Wang et al. *Beyond Item Dissimilarities: Diversifying by Intent in Recommender Systems.* KDD 2025.

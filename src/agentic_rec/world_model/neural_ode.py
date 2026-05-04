@@ -72,6 +72,29 @@ class NeuralODEWorldModel(nn.Module):
             u = u + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         return u
 
+    def multi_step_rk4(
+        self,
+        u: Tensor,
+        actions: Tensor,
+        dt: float = 1.0,
+        steps: int = 4,
+    ) -> Tensor:
+        """Integrate multiple steps with a sequence of actions.
+
+        Args:
+            u: Initial state (batch, state_dim).
+            actions: Action sequence (batch, n_steps, action_dim).
+            dt: Time step per action.
+            steps: RK4 sub-steps per action.
+
+        Returns:
+            Final state after all steps (batch, state_dim).
+        """
+        n_steps = actions.size(1)
+        for i in range(n_steps):
+            u = self.step_rk4(u, actions[:, i, :], dt=dt, steps=steps)
+        return u
+
 
 def train_world_model_epoch(
     model: nn.Module,
@@ -95,7 +118,61 @@ def train_world_model_epoch(
         next_state = batch["next_state"].to(device)
 
         prediction = model.step_rk4(current_state, action)
-        loss = criterion(prediction, next_state)
+        # State-level loss
+        mse_state = criterion(prediction, next_state)
+        cosine_state = (1.0 - torch.nn.functional.cosine_similarity(prediction, next_state, dim=-1)).mean()
+        # Drift-level loss: force model to learn the CHANGE, not just the state
+        drift_pred = prediction - current_state
+        drift_true = next_state - current_state
+        mse_drift = criterion(drift_pred, drift_true)
+        cosine_drift = (1.0 - torch.nn.functional.cosine_similarity(
+            drift_pred, drift_true + 1e-8, dim=-1)).mean()
+        loss = mse_state + 1.0 * mse_drift + 0.5 * cosine_state + 1.0 * cosine_drift
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        batch_size = current_state.size(0)
+        total_loss += loss.item() * batch_size
+        total_examples += batch_size
+
+    return total_loss / max(total_examples, 1)
+
+
+def train_world_model_epoch_multi_step(
+    model: nn.Module,
+    dataloader,
+    optimizer: torch.optim.Optimizer,
+    device: str = "cuda",
+    n_steps: int = 3,
+) -> float:
+    """Train Neural ODE world model with multi-step prediction.
+
+    Expects batches with keys: "state", "actions" (batch, n_steps, action_dim),
+    "next_state" (target after all n_steps).
+    """
+    model.train()
+    criterion = nn.MSELoss()
+    total_loss = 0.0
+    total_examples = 0
+
+    for batch in dataloader:
+        current_state = batch["state"].to(device)
+        actions = batch["actions"].to(device)
+        target_state = batch["next_state"].to(device)
+
+        prediction = model.multi_step_rk4(current_state, actions)
+        # State-level loss
+        mse_state = criterion(prediction, target_state)
+        cosine_state = (1.0 - torch.nn.functional.cosine_similarity(prediction, target_state, dim=-1)).mean()
+        # Drift-level loss: force model to learn multi-step CHANGE
+        drift_pred = prediction - current_state
+        drift_true = target_state - current_state
+        mse_drift = criterion(drift_pred, drift_true)
+        cosine_drift = (1.0 - torch.nn.functional.cosine_similarity(
+            drift_pred, drift_true + 1e-8, dim=-1)).mean()
+        loss = mse_state + 1.0 * mse_drift + 0.5 * cosine_state + 1.0 * cosine_drift
 
         optimizer.zero_grad()
         loss.backward()

@@ -44,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--embedding-max-length", type=int, default=512)
     parser.add_argument("--embedding-cache", type=Path, default=None)
     parser.add_argument("--no-embedding-progress", action="store_true")
+    parser.add_argument("--world-model-n-steps", type=int, default=1,
+                        help="Number of consecutive clicks per world-model row (1=single-step, 3=multi-step).")
     parser.add_argument("--seed", type=int, default=7)
     return parser.parse_args()
 
@@ -96,6 +98,7 @@ def main() -> None:
             seed=args.seed,
             max_behaviors=None if behavior_limit == 0 else behavior_limit,
             embedding_config=embedding_config,
+            world_model_n_steps=args.world_model_n_steps,
         )
 
     manifest = {

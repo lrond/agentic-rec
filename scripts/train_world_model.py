@@ -42,10 +42,13 @@ def _state_from_history(history_ids, vectors, id_to_idx, history_size, embedding
 
 
 class WorldModelDataset(Dataset):
-    """Precomputed dataset: state/action/next_state built in __init__, O(1) __getitem__."""
+    """Precomputed dataset: state/action/next_state built in __init__, O(1) __getitem__.
+
+    Supports both single-step (clicked_id) and multi-step (clicked_ids) formats.
+    """
 
     def __init__(self, path: Path, vectors_path: Path, history_size: int = 50,
-                 max_rows: int | None = None) -> None:
+                 max_rows: int | None = None, n_steps: int = 1) -> None:
         vectors, id_to_idx = _load_vectors_npz(vectors_path)
         emb_dim = vectors.shape[1]
 
@@ -59,32 +62,51 @@ class WorldModelDataset(Dataset):
                     rows.append(json.loads(stripped))
         if not rows:
             raise ValueError(f"World-model training data is empty: {path}")
-        print(f"WorldModelDataset: loaded {len(rows)} rows, precomputing states...")
+        print(f"WorldModelDataset: loaded {len(rows)} rows, precomputing states (n_steps={n_steps})...")
 
         N = len(rows)
+        self._n_steps = n_steps
         self._state = np.zeros((N, emb_dim), dtype=np.float32)
-        self._action = np.zeros((N, emb_dim), dtype=np.float32)
+        if n_steps <= 1:
+            self._action = np.zeros((N, emb_dim), dtype=np.float32)
+        else:
+            self._actions = np.zeros((N, n_steps, emb_dim), dtype=np.float32)
         self._next_state = np.zeros((N, emb_dim), dtype=np.float32)
+        self._multi_step = n_steps > 1
 
         for i, row in enumerate(rows):
             hids = row.get("history_ids", [])
-            cid = row.get("clicked_id", "")
             self._state[i] = _state_from_history(hids, vectors, id_to_idx, history_size, emb_dim)
-            if cid in id_to_idx:
-                self._action[i] = vectors[id_to_idx[cid]]
-            self._next_state[i] = _state_from_history(hids + [cid], vectors, id_to_idx, history_size, emb_dim)
 
-        print(f"WorldModelDataset: precomputed {N} samples ({emb_dim}-dim)")
+            if self._multi_step:
+                cids = row.get("clicked_ids", [])
+                for j, cid in enumerate(cids[:n_steps]):
+                    if cid in id_to_idx:
+                        self._actions[i, j] = vectors[id_to_idx[cid]]
+                # Target: state after all clicked articles
+                all_ids = hids + cids[:n_steps]
+                self._next_state[i] = _state_from_history(all_ids, vectors, id_to_idx, history_size, emb_dim)
+            else:
+                cid = row.get("clicked_id", "")
+                if cid in id_to_idx:
+                    self._action[i] = vectors[id_to_idx[cid]]
+                self._next_state[i] = _state_from_history(hids + [cid], vectors, id_to_idx, history_size, emb_dim)
+
+        print(f"WorldModelDataset: precomputed {N} samples ({emb_dim}-dim, multi_step={self._multi_step})")
 
     def __len__(self) -> int:
         return len(self._state)
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
-        return {
+        result = {
             "state": torch.from_numpy(self._state[index]),
-            "action": torch.from_numpy(self._action[index]),
             "next_state": torch.from_numpy(self._next_state[index]),
         }
+        if self._multi_step:
+            result["actions"] = torch.from_numpy(self._actions[index])
+        else:
+            result["action"] = torch.from_numpy(self._action[index])
+        return result
 
 
 def load_jsonl(path: Path) -> list[dict[str, object]]:
@@ -132,6 +154,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-type", choices=["linear", "neural_ode"], default="linear")
     parser.add_argument("--ode-hidden", type=int, default=512)
     parser.add_argument("--ode-steps", type=int, default=4)
+    parser.add_argument("--n-steps", type=int, default=1,
+                        help="Number of prediction steps (1=single, 3=multi-step).")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--seed", type=int, default=11)
     return parser.parse_args()
@@ -144,7 +168,7 @@ def main() -> None:
     if args.train_data is not None:
         if args.vectors_path is None:
             raise SystemExit("--vectors-path is required with --train-data")
-        dataset = WorldModelDataset(args.train_data, args.vectors_path)
+        dataset = WorldModelDataset(args.train_data, args.vectors_path, n_steps=args.n_steps)
         state_dim = args.state_dim or dataset._state.shape[1]
         action_dim = args.action_dim or dataset._action.shape[1]
     else:
@@ -163,17 +187,27 @@ def main() -> None:
 
     if args.model_type == "neural_ode":
         model = NeuralODEWorldModel(state_dim=state_dim, action_dim=action_dim, hidden=args.ode_hidden).to(device)
-        train_fn = train_neural_ode_epoch
-        print(f"Using Neural ODE world model (hidden={args.ode_hidden}, rk4_steps={args.ode_steps})")
+        if args.n_steps > 1:
+            from agentic_rec.world_model.neural_ode import train_world_model_epoch_multi_step
+            train_fn = train_world_model_epoch_multi_step
+            print(f"Using Neural ODE world model (hidden={args.ode_hidden}, multi_step={args.n_steps})")
+        else:
+            train_fn = train_neural_ode_epoch
+            print(f"Using Neural ODE world model (hidden={args.ode_hidden}, rk4_steps={args.ode_steps})")
     else:
         model = TorchLinearWorldModel(state_dim=state_dim, action_dim=action_dim).to(device)
         train_fn = train_linear_epoch
+        if args.n_steps > 1:
+            print("Warning: --n-steps > 1 requires --model-type neural_ode; ignoring multi-step")
         print("Using linear world model")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     for epoch in range(1, args.epochs + 1):
-        loss = train_fn(model, dataloader, optimizer, device=device)
+        if args.n_steps > 1 and args.model_type == "neural_ode":
+            loss = train_fn(model, dataloader, optimizer, device=device, n_steps=args.n_steps)
+        else:
+            loss = train_fn(model, dataloader, optimizer, device=device)
         print(f"epoch={epoch} loss={loss:.4f}")
 
     args.save_path.parent.mkdir(parents=True, exist_ok=True)

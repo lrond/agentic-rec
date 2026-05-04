@@ -1,34 +1,27 @@
+# OS
 .DS_Store
+
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.venv/
-.env
-
-# Data — track embedding matrices and raw data
-data/*
-!data/.gitkeep
-!data/processed/
-!data/processed/news_vectors_*.npz
-!data/raw/
-!data/raw/**
-
-# Artifacts — track metrics and model checkpoints
-artifacts/*
-!artifacts/.gitkeep
-!artifacts/eval_metrics.json
-!artifacts/ranker.pt
-!artifacts/world_model.pt
-
-*.zip
-*.tar
-*.tar.gz
-*.ckpt
-*.pt
-*.pth
 *.egg-info/
 *.egg
-data/raw/mind/MINDsmall_train/behaviors_train.tsv.gz
-data/raw/
+.venv/
+.env
+.pytest_cache/
 
-data/processed/news_features_dev.jsonl
+# Data — user downloads separately (see DATA.md)
+data/
+
+# Artifacts — generated at runtime
+artifacts/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project temp
+.hermes/
+training.log
