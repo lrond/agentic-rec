@@ -162,7 +162,7 @@ MIND 新闻推荐数据集（PaddleRec 镜像），约 96,000 篇新闻，百万
 | 指标 | 恒等映射 | Neural ODE（纯 MSE） | Neural ODE（Drift-Aware） |
 |------|:--:|:--:|:--:|
 | State Cosine | 0.9857 | **0.9968** | 0.9927 |
-| State MSE | $7.5\!	imes\!10^{-5}$ | **$1.5\!	imes\!10^{-5}$** | $3.7\!	imes\!10^{-5}$ |
+| State MSE | 7.5e-5 | **1.5e-5** | 3.7e-5 |
 
 | Drift Cosine | 恒等映射 | 纯 MSE | Drift-Aware |
 |------|:--:|:--:|:--:|
