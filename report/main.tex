@@ -1,55 +1,57 @@
 % !TEX program = xelatex
 \documentclass[twocolumn,10pt,a4paper]{ctexart}
 
-% ── Geometry ──
+% ── Geometry (ACL-like) ──
 \usepackage{geometry}
-\geometry{left=1.6cm,right=1.6cm,top=2cm,bottom=2cm,columnsep=0.7cm}
+\geometry{left=2cm,right=2cm,top=2.5cm,bottom=2.5cm,columnsep=0.8cm}
 
-% ── Fonts & Typography ──
+% ── Typography ──
 \setCJKmainfont{Songti SC}[BoldFont=Heiti SC]
 \setmainfont{Times New Roman}
 \usepackage{setspace}
-\setstretch{1.02}
+\setstretch{1.0}
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{1.5em}
+\setlength{\abovedisplayskip}{3pt}
+\setlength{\belowdisplayskip}{3pt}
 
 % ── Packages ──
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{multirow}
 \usepackage{amsmath,amssymb}
 \usepackage{hyperref}
-\usepackage[numbers,sort&compress]{natbib}
+\usepackage[numbers,sort&compress,square]{natbib}
 \usepackage{xcolor}
 \usepackage{float}
 \usepackage{caption}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
 \usepackage{enumitem}
-\setlist{nosep,leftmargin=*}
+\setlist{nosep,leftmargin=*,topsep=0pt,partopsep=0pt}
 
 % ── Colors ──
 \definecolor{ink}{HTML}{1A1C1E}
 \definecolor{copper}{HTML}{C7512E}
 \definecolor{slate}{HTML}{4A5568}
 \definecolor{bg}{HTML}{F7FAFC}
-\definecolor{hl}{HTML}{EDF2F7}
 
-% ── Caption style ──
-\captionsetup{font={small,color=slate},labelfont={color=copper},skip=4pt}
+% ── Captions ──
+\captionsetup{font={small},labelfont=bf,skip=4pt}
 
 % ── Headers ──
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\footnotesize\color{slate}Intent-Drift News Planner}
-\fancyhead[R]{\footnotesize\color{slate}\thepage}
+\fancyhead[L]{\footnotesize Intent-Drift News Planner}
+\fancyhead[R]{\footnotesize\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
 
 % ── Section formatting ──
-\CTEXsetup[format={\Large\bfseries\color{ink}}]{section}
-\CTEXsetup[format={\large\bfseries\color{slate}}]{subsection}
+\CTEXsetup[format={\Large\bfseries}]{section}
+\CTEXsetup[format={\large\bfseries}]{subsection}
 
 % ── Title ──
-\title{{\LARGE\bfseries Intent-Drift News Planner}\\[4pt]
+\title{{\LARGE\bfseries Intent-Drift News Planner}\\[3pt]
 {\large 基于 Neural ODE 与 Beam Search 的\\新闻推荐兴趣漂移建模}}
 \author{}
 \date{}
@@ -93,7 +95,7 @@ MIND（Microsoft News Dataset）~\cite{wu2020mind} 是新闻推荐领域广泛�
 \centering
 \caption{数据集统计}
 \label{tab:data}
-\footnotesize
+\small
 \begin{tabular}{@{}lrr@{}}
 \toprule
 & 训练集 & 验证集 \\
@@ -202,7 +204,7 @@ Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch}
 \centering
 \caption{GRU 双塔排序器性能（2,000 impressions）}
 \label{tab:ranker}
-\footnotesize
+\small
 \begin{tabular}{@{}lc@{}}
 \toprule
 指标 & 值 \\
@@ -231,7 +233,7 @@ ILS@5 & 0.579 \\
 \centering
 \caption{世界模型漂移预测对比（3 步，46,792 样本）}
 \label{tab:wm}
-\footnotesize
+\small
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 指标 & 恒等映射 & Neural ODE & Neural ODE \\
@@ -261,7 +263,7 @@ State Cosine & 0.9857 & 0.9968 & 0.9927 \\
 \centering
 \caption{Ranker-only 与 Planner 对比（2,000 impressions）}
 \label{tab:planner}
-\footnotesize
+\small
 \begin{tabular}{@{}lcc@{}}
 \toprule
 指标 & Ranker-only & + Planner \\
