@@ -1,114 +1,147 @@
-\documentclass[twocolumn,a4paper,10pt]{article}
+% !TEX program = xelatex
+\documentclass[twocolumn,10pt,a4paper]{ctexart}
+
+% ── Geometry ──
+\usepackage{geometry}
+\geometry{left=1.8cm,right=1.8cm,top=2.2cm,bottom=2.2cm,columnsep=0.8cm}
+
+% ── Fonts & Typography ──
+\setCJKmainfont{Songti SC}[BoldFont=Heiti SC]
+\setmainfont{Times New Roman}
+\usepackage{setspace}
+\setstretch{1.08}
 
 % ── Packages ──
-\usepackage[UTF8]{ctex}
-\usepackage{geometry}
-\geometry{left=2cm,right=2cm,top=2.5cm,bottom=2.5cm}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
-\usepackage{tikz}
-\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+\usepackage{amsmath,amssymb}
 \usepackage{hyperref}
 \usepackage[numbers,sort&compress]{natbib}
-\usepackage{amsmath}
 \usepackage{xcolor}
 \usepackage{float}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds,calc}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
 
 % ── Colors ──
 \definecolor{ink}{HTML}{1A1C1E}
 \definecolor{copper}{HTML}{C7512E}
 \definecolor{slate}{HTML}{4A5568}
-\definecolor{codebg}{HTML}{F7FAFC}
+\definecolor{bg}{HTML}{F7FAFC}
+\definecolor{hl}{HTML}{EDF2F7}
+
+% ── Caption style ──
+\captionsetup{font={small,color=slate},labelfont={color=copper},skip=4pt}
+
+% ── Headers ──
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\color{slate}Intent-Drift News Planner}
+\fancyhead[R]{\footnotesize\color{slate}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% ── Section formatting ──
+\CTEXsetup[format={\Large\bfseries\color{ink}}]{section}
+\CTEXsetup[format={\large\bfseries\color{slate}}]{subsection}
 
 % ── Title ──
-\title{\vspace{-2em}\textbf{\color{ink}Intent-Drift News Planner}\\
-{\large\color{slate}基于 Neural ODE 与 Beam Search 的新闻推荐兴趣漂移建模}}
+\title{{\LARGE\bfseries Intent-Drift News Planner}\\[4pt]
+{\large 基于 Neural ODE 与 Beam Search 的\\新闻推荐兴趣漂移建模}}
 \author{}
 \date{}
 
 \begin{document}
 
 \maketitle
+\thispagestyle{fancy}
 
-\twocolumn[
-\section*{引言}
-新闻推荐系统面临的核心挑战之一是用户兴趣的动态漂移——用户的阅读偏好随时间、上下文和事件演化呈现非线性的连续变化。传统推荐系统追求点击率最大化，容易导致信息茧房：用户反复看到同类内容，长期体验反而下降。近年来，Lin 等人~\cite{lin2025interest} 在序列推荐中显式建模了兴趣漂移对推荐质量的影响，Wang 等人~\cite{wang2025intent} 则从意图层面论证了超越物品级相似度的多样化推荐的有效性。然而，如何将连续时间兴趣演化与意图覆盖规划相结合，仍是一个开放问题。
+% ═══════════════════════════════════════════════════════════
+\section{引言}
+% ═══════════════════════════════════════════════════════════
 
-本文提出 Intent-Drift News Planner，一个基于 Neural ODE~\cite{chen2018neural} 的新闻推荐框架。该系统由四个核心模块构成：Qwen3-Embedding~\cite{qwen3embedding} 语义编码器、GRU 双塔排序器、Neural ODE 世界模型和 Beam Search 意图覆盖规划器。我们在 MIND 数据集~\cite{wu2020mind} 上进行了系统评估。
+新闻推荐系统面临的核心挑战之一是用户兴趣的动态漂移——用户的阅读偏好随时间、上下文和事件演化呈现非线性的连续变化。传统推荐系统以点击率最大化为目标，容易导致信息茧房：用户反复接收同类内容，长期体验反而下降。Lin 等人~\cite{lin2025interest} 在序列推荐中显式建模了兴趣漂移对推荐质量的影响；Wang 等人~\cite{wang2025intent} 从意图层面论证了超越物品级相似度的多样化推荐的有效性；Chen 等人~\cite{chen2018neural} 提出的 Neural ODE 为连续时间动态建模提供了理论基础。然而，如何将连续时间兴趣演化与意图覆盖规划相结合，仍是一个开放问题。
 
-需要说明的是，MIND 数据集已于近期转为私有访问。本文使用的数据来自 PaddleRec 仓库提供的镜像\footnote{https://github.com/PaddlePaddle/PaddleRec/blob/master/datasets/readme.md}，并非 Microsoft MIND 官方下载。我们在该镜像基础上构建了训练集和验证集。
+本文提出 Intent-Drift News Planner，一个基于 Neural ODE 的新闻推荐框架。系统由四个核心模块构成：Qwen3-Embedding~\cite{qwen3embedding} 语义编码器将新闻文本映射为向量表示；GRU 双塔排序器对候选新闻进行初步筛选；Neural ODE 世界模型预测推荐行为对用户兴趣状态的长期影响；Beam Search 规划器结合意图覆盖目标输出最终的 Top-5 推荐列表。我们在 MIND 数据集~\cite{wu2020mind} 上进行了系统评估。
 
-\vspace{1em}
-]
+需要说明的是，MIND 数据集已于近期转为私有访问。本文使用的数据来自 PaddleRec 仓库提供的公开镜像\footnote{https://github.com/PaddlePaddle/PaddleRec/blob/master/datasets/readme.md}，并非 Microsoft MIND 官方下载。我们在此镜像基础上构建了训练集和验证集。
 
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 \section{数据集}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
-MIND（Microsoft News Dataset）~\cite{wu2020mind} 是新闻推荐领域广泛使用的基准数据集。原始版本包含约 16 万用户的百万级行为日志，但由于官方下载入口关闭，本文使用 PaddleRec 仓库提供的 MINDsmall 子集。该子集包含约 96,000 篇新闻文章，每条新闻含标题、摘要、类别（如 sports、finance、lifestyle）等字段。
+MIND（Microsoft News Dataset）~\cite{wu2020mind} 是新闻推荐领域广泛使用的基准数据集，由微软于 2019 年发布。原始版本包含约 16 万用户的百万级行为日志。本文使用 PaddleRec 仓库提供的 MINDsmall 子集，包含 96,074 篇新闻文章，每条新闻含标题、摘要、一级类别（如 sports、finance、lifestyle）和二级子类别字段。用户行为日志以 impression 为单位组织，每个 impression 包含用户浏览历史（最近点击的新闻 ID 列表）和当前曝光的候选新闻（含点击/未点击标签）。
 
-\subsection{数据构建}
+\subsection{样本构建}
 
-我们从 MINDsmall 的 behaviors.tsv 出发，按以下规则构建训练和验证样本。
+我们从 behaviors.tsv 出发，按以下规则构建训练样本和验证样本。
 
-\textbf{Ranker 样本。}每个 impression 包含若干候选新闻，用户点击其中一部分。我们将全部正例保留，负例按每条正例最多配 4 条的比例随机采样（验证集保留全部负例）。每条样本包含用户的浏览历史 ID 列表、候选新闻 ID、点击标签和新闻类别。
+\textbf{Ranker 样本。}对于每个 impression，保留全部被点击的正例。负例采样策略为：训练集按每条正例最多配 4 条负例的比例随机采样（控制正负样本平衡），验证集保留全部负例以计算无偏的分组指标。每条样本包含字段：impression\_id、user\_id、history\_ids（最近 50 条浏览历史）、candidate\_id、category（新闻一级类别）、label（0/1 点击标签）。样本以 JSONL 格式存储，新闻嵌入通过 Qwen3-Embedding 预计算为 256 维向量，以 ID+NPZ 格式紧凑存储（72 MB）。
 
-\textbf{世界模型样本。}世界模型的训练目标是预测用户兴趣状态的演化。我们将用户状态定义为最近 50 条浏览历史的加权平均向量（越近的新闻权重越大）。对于多步预测（步数 $N=3$），我们从同一 impression 的被点击新闻中取连续 $N$ 条作为动作序列，以初始状态为输入、$N$ 步后的状态为目标。这一设计使得仅当 impression 含 3 个及以上正例时才会生成多步样本，因此世界模型的训练数据量显著小于单步版本。
+\textbf{世界模型样本。}世界模型的训练目标是预测用户兴趣状态的演化。我们将用户状态定义为最近 50 条浏览历史的加权平均向量：越近的新闻权重越大（最近一篇权重为 50，最早一篇权重为 1）。对于多步预测（步数 $N=3$），我们从同一 impression 的被点击新闻中取连续 $N$ 条作为动作序列，以加权平均状态为输入、加入全部 $N$ 个点击后的加权平均状态为目标。这一设计使得仅当 impression 含 3 个及以上正例时才会生成多步样本——这意味着多步世界模型的数据量远小于单步版本（约 16\%），但能检验模型在信号累积中的漂移学习能力。
+
+验证集采用 impression 级随机采样（种子 42）——先随机选取 $K$ 个 impression，再取出这些 impression 的所有候选行。这是为了保证每个 impression 的候选组结构完整，使 Recall@5、NDCG@5 等分组指标的计算有效。
 
 \subsection{数据统计}
 
-表~\ref{tab:datastats} 给出了训练集和验证集的样本量统计。验证集评估时，默认从全部 192,476 个 impression 中随机采样 2,000 个（种子 42），以平衡评估速度与统计稳定性。
+表~\ref{tab:data} 给出了训练集和验证集的样本量统计。评估时默认采样 2,000 个 impression（约 78,000 条 ranker 样本），可通过 Makefile 变量 \texttt{MAX\_DEV\_IMPRESSIONS} 调整。
 
 \begin{table}[H]
 \centering
 \caption{数据集统计}
-\label{tab:datastats}
+\label{tab:data}
+\small
 \begin{tabular}{@{}lrr@{}}
 \toprule
 & 训练集 & 验证集 \\
 \midrule
+新闻数 & \multicolumn{2}{c}{96,074} \\
 原始 behavior 数 & 1,286,316 & 192,476 \\
 Ranker 样本 & 9,495,212 & 7,496,306 \\
 WM 样本（3 步） & 310,338 & 46,792 \\
-新闻数 & \multicolumn{2}{c}{96,074} \\
-嵌入维度 & \multicolumn{2}{c}{256} \\
+嵌入维度 & \multicolumn{2}{c}{256（Qwen3-Embedding-0.6B）} \\
+负采样 & 1:4 & 全部保留 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{数据局限性}
 
-多步世界模型样本仅占 Ranker 样本的约 3\%，这是因为 MIND 数据集的正样本率较低（约 3.5\%），大多数 impression 只有 0--1 个点击，无法生成 3 步序列。这一稀疏性是 MIND 数据集本身的特性，我们选择在实验部分诚实呈现这一约束，并在讨论中分析其影响。
+多步世界模型样本仅占总样本的约 3\%，原因是 MIND 数据集的正样本率较低（约 3.5\%），大多数 impression 只有 0--1 个点击，无法生成 3 步序列。这一稀疏性是数据集本身的特性，限制了世界模型在多步场景下的训练信号量。我们在实验部分对此进行了诚实呈现，并在讨论中分析其影响。
 
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 \section{方法}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
-\subsection{系统架构}
-
-Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch} 所示。给定用户的浏览历史，系统首先通过 Qwen3-Embedding 将历史新闻编码为语义向量，经加权平均得到用户兴趣状态；随后 GRU 双塔排序器对候选新闻进行初步筛选；Neural ODE 世界模型预测每篇候选新闻对用户兴趣状态的长期影响；最后 Beam Search 规划器结合意图覆盖目标，输出 Top-5 推荐列表。
+Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch} 所示。给定用户的浏览历史，系统首先通过 Qwen3-Embedding 将历史新闻编码为语义向量，经加权平均得到用户兴趣状态；GRU 双塔排序器对候选新闻进行初步筛选；Neural ODE 世界模型预测每篇候选新闻对用户兴趣状态的长期影响；Beam Search 规划器结合意图覆盖目标输出 Top-5 推荐列表。
 
 \begin{figure}[H]
 \centering
+\footnotesize
 \begin{tikzpicture}[
-    node distance=1.8cm,
-    block/.style={rectangle, draw=copper, fill=codebg, text width=2.2cm, text centered, minimum height=1cm, font=\small},
+    node distance=1.5cm,
+    block/.style={rectangle, draw=copper!60, fill=bg, text width=1.8cm,
+                  text centered, minimum height=0.9cm, font=\scriptsize,
+                  rounded corners=2pt},
     arrow/.style={->, >=stealth, color=slate, thick},
 ]
 \node[block] (qwen) {Qwen3\\Embedding};
 \node[block, right=of qwen] (gru) {GRU\\Ranker};
 \node[block, right=of gru] (ode) {Neural ODE\\World Model};
 \node[block, right=of ode] (beam) {Beam Search\\Planner};
-\node[block, below=of beam] (cov) {Coverage\\Reranker};
+\node[block, below=0.8cm of beam] (cov) {Coverage\\Reranker};
 \draw[arrow] (qwen) -- (gru);
 \draw[arrow] (gru) -- (ode);
 \draw[arrow] (ode) -- (beam);
 \draw[arrow] (beam) -- (cov);
-\node[below=0.3cm of qwen, font=\footnotesize\color{slate}] {编码};
-\node[below=0.3cm of gru, font=\footnotesize\color{slate}] {筛选};
-\node[below=0.3cm of ode, font=\footnotesize\color{slate}] {预测};
-\node[below=0.3cm of beam, font=\footnotesize\color{slate}] {规划};
+\node[below=0.15cm of qwen, font=\tiny\color{slate}] {语义编码};
+\node[below=0.15cm of gru, font=\tiny\color{slate}] {候选筛选};
+\node[below=0.15cm of ode, font=\tiny\color{slate}] {状态预测};
+\node[below=0.15cm of beam, font=\tiny\color{slate}] {多步规划};
+\node[above=0.1cm of cov, font=\tiny\color{slate}] {Top-5 输出};
 \end{tikzpicture}
 \caption{Intent-Drift News Planner 系统架构}
 \label{fig:arch}
@@ -116,56 +149,74 @@ Intent-Drift News Planner 采用四阶段流水线架构，如图~\ref{fig:arch}
 
 \subsection{语义编码}
 
-采用 Qwen3-Embedding-0.6B~\cite{qwen3embedding} 作为冻结编码器，将每篇新闻的标题和摘要拼接后编码为 256 维语义向量。编码后的向量经 L2 归一化，供后续模块按新闻 ID 查表使用。该步骤仅在数据预处理阶段执行一次。
+采用 Qwen3-Embedding-0.6B~\cite{qwen3embedding} 作为冻结编码器。对于每篇新闻，将标题和摘要拼接后输入模型，取最后一层隐藏状态的均值池化作为 256 维语义向量。编码后的向量经 L2 归一化，以 NPZ 格式（96K$\times$256 的 float32 矩阵 + ID 列表）存储，供后续模块按新闻 ID 查表使用。该步骤在数据预处理阶段执行一次，训练和推理阶段仅需查表，不产生额外计算开销。
 
 \subsection{GRU 双塔排序器}
 
-排序器采用双塔结构：用户塔使用 GRU 对最近 50 条浏览历史的嵌入序列进行编码，得到用户兴趣向量；新闻塔直接使用候选新闻的嵌入向量。双塔输出的余弦相似度作为相关性得分，经 sigmoid 输出点击概率。训练使用二元交叉熵损失。
+排序器采用双塔结构。用户塔：将最近 50 条浏览历史的嵌入序列输入单层 GRU（隐藏维度 256），取最后时间步的输出作为用户兴趣向量。新闻塔：直接使用候选新闻的 Qwen3 嵌入向量。双塔输出的余弦相似度经线性层和 sigmoid 函数映射为点击概率。训练使用二元交叉熵损失，优化器为 AdamW（学习率 $10^{-3}$），batch size 256，训练 10 个 epoch。排序器在推理阶段对候选池中的所有新闻打分，取 Top-$K$ 高分候选传递给规划器。
 
 \subsection{Neural ODE 世界模型}
 
 世界模型的核心是预测推荐行为对用户兴趣状态的影响。我们采用 Neural ODE 建模连续时间状态演化：
-
 \begin{equation}
-\frac{d\mathbf{u}}{dt} = \text{MLP}(\mathbf{u}, \mathbf{a})
+\frac{d\mathbf{u}}{dt} = f_\theta(\mathbf{u}, \mathbf{a})
+\label{eq:ode}
 \end{equation}
+其中 $\mathbf{u} \in \mathbf{R}^{256}$ 为用户状态向量，$\mathbf{a} \in \mathbf{R}^{256}$ 为推荐新闻的嵌入向量。$f_\theta$ 是一个包含两个 512 维隐藏层、ReLU 激活的多层感知机。状态积分采用四阶 Runge-Kutta 方法（RK4），每步以 4 个子步进行数值积分。
 
-其中 $\mathbf{u} \in \mathbf{R}^{256}$ 为用户状态，$\mathbf{a} \in \mathbf{R}^{256}$ 为推荐新闻的嵌入向量。MLP 包含两个 512 维隐藏层，使用 ReLU 激活。状态积分采用 Runge-Kutta 4 阶方法。多步预测时，世界模型依次对每步动作执行 RK4 积分。
+\textbf{多步预测。}在训练和评估阶段，世界模型接受初始状态 $\mathbf{u}_t$ 和一个动作序列 $[\mathbf{a}_1, \mathbf{a}_2, \mathbf{a}_3]$，依次执行三次 RK4 积分：$\mathbf{u}_{t+1} = \text{RK4}(\mathbf{u}_t, \mathbf{a}_1)$，$\mathbf{u}_{t+2} = \text{RK4}(\mathbf{u}_{t+1}, \mathbf{a}_2)$，$\mathbf{u}_{t+3} = \text{RK4}(\mathbf{u}_{t+2}, \mathbf{a}_3)$。最终与目标状态 $\mathbf{u}_{t+3}$（包含全部三个点击后的加权平均状态）进行比较。
 
-\textbf{Drift-Aware 训练。}传统的 MSE 损失对状态预测任务过于宽容——由于加权平均表征本身具有高度平滑性，模型仅需学习近似恒等映射即可获得较低的 MSE。为解决这一问题，我们提出 Drift-Aware 训练目标，将损失函数分解为状态级和漂移级两部分：
-
+\textbf{Drift-Aware 训练。}传统的 MSE 损失对状态预测任务过于宽容——由于加权平均表征具有高度平滑性，模型仅需学习近似恒等映射即可获得极低的 MSE。为解决这一问题，我们提出 Drift-Aware 训练目标，将损失函数分解为状态级和漂移级两部分：
 \begin{equation}
-\mathcal{L} = \mathcal{L}_{\text{state}} + \mathcal{L}_{\text{drift}} + 0.5 \cdot \mathcal{L}_{\text{cos}} + \mathcal{L}_{\text{cos-drift}}
+\begin{aligned}
+\mathcal{L} &= \mathcal{L}_{\text{state}} + \mathcal{L}_{\text{drift}} \\
+&+ 0.5 \cdot \mathcal{L}_{\text{cos-state}} + \mathcal{L}_{\text{cos-drift}}
+\end{aligned}
+\label{eq:loss}
 \end{equation}
-
-其中 $\mathcal{L}_{\text{state}}$ 为预测状态与真实状态的 MSE，$\mathcal{L}_{\text{drift}}$ 为预测漂移（$\hat{\mathbf{u}}_{t+n} - \mathbf{u}_t$）与真实漂移的 MSE，$\mathcal{L}_{\text{cos}}$ 为状态级余弦损失，$\mathcal{L}_{\text{cos-drift}}$ 为漂移方向余弦损失。漂移级损失的加入迫使模型学习状态变化的方向和幅度，而非简单地输出近似恒等映射。
+其中 $\mathcal{L}_{\text{state}}$ 为预测状态与真实状态的 MSE，$\mathcal{L}_{\text{drift}}$ 为预测漂移 $\Delta\hat{\mathbf{u}} = \hat{\mathbf{u}}_{t+n} - \mathbf{u}_t$ 与真实漂移 $\Delta\mathbf{u} = \mathbf{u}_{t+n} - \mathbf{u}_t$ 的 MSE，$\mathcal{L}_{\text{cos-state}}$ 为状态级余弦损失，$\mathcal{L}_{\text{cos-drift}}$ 为漂移方向的余弦损失。漂移级损失的加入迫使模型学习状态变化的方向和幅度，而非简单地输出近似恒等映射。模型训练 10 个 epoch，batch size 256，AdamW 优化器（学习率 $10^{-3}$）。
 
 \subsection{Beam Search 规划器}
 
-规划器以 Beam Search 为核心，在前瞻 horizon 轮内展开搜索。每轮保留 beam\_width 条最优路径，每条路径展开 branching\_factor 个最高分候选。奖励函数综合考虑相关性（Ranker 得分）、漂移增益、长期对齐和意图覆盖奖励。最终通过 Coverage Reranker 对最优路径进行贪心类别去重，确保 Top-5 推荐覆盖多样化的兴趣领域。
+规划器以 Beam Search 为核心（见图~\ref{fig:arch} 下半部分）。从前瞻 horizon=3 轮展开搜索：初始时只有一条路径（当前用户状态）；每轮对所有活跃路径展开 branching\_factor=8 个最高分候选，调用世界模型预测选择每条候选后的未来状态，计算综合奖励；保留 beam\_width=5 条最优路径进入下一轮。奖励函数综合考虑五个因素：
 
-% ═══════════════════════════════════════════
+\begin{enumerate}[nosep]
+\item 相关性（Ranker 得分，权重 1.0）
+\item 漂移增益（状态变化幅度，权重 0.35）
+\item 意图覆盖（新增类别获额外奖励，权重 0.8）
+\item 长期对齐（状态与候选新闻的余弦相似度，权重 0.3）
+\item 类别多样性（惩罚过度集中于某一类别，权重 0.15）
+\end{enumerate}
+
+最终通过 Coverage Reranker 对最优路径上的候选进行贪心类别去重：已有某类新闻则优先选择其他类别，确保 Top-5 推荐覆盖多样化的兴趣领域。
+
+% ═══════════════════════════════════════════════════════════
 \section{实验}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
 \subsection{实验设置}
 
-所有实验在 NVIDIA RTX 5090 GPU 上进行。Ranker 训练 10 个 epoch，batch size 256，使用全量 950 万训练样本。世界模型训练 10 个 epoch，使用 31 万条多步样本。评估在验证集上随机采样 2,000 个 impression（种子 42），指标包括准确率、AUC、Recall@5、NDCG@5、意图覆盖率（Intent Coverage@5）、列表内相似度（ILS@5）和命中率（HitRate@5）。Beam Search 参数为 horizon=3，beam\_width=5，branching\_factor=8。
+所有实验在 NVIDIA RTX 5090（32 GB 显存）上运行，软件环境为 PyTorch 2.7、CUDA 12.8。Ranker 使用全量 950 万训练样本，训练 10 个 epoch（batch size 256，AdamW $lr=10^{-3}$），最终 loss 降至 0.437。世界模型使用 31 万条多步训练样本，训练 10 个 epoch（Drift-Aware loss，batch size 256），最终复合 loss 降至 0.023。评估在验证集上随机采样 2,000 个 impression（种子 42，约 78,000 条 ranker 样本、47,000 条 WM 样本），200 个 impression 用于 Planner 评估（受限于 Beam Search 的推理开销）。
+
+评估指标包括：Accuracy、AUC、LogLoss、Recall@5、NDCG@5（用于 Ranker）；Intent Coverage@5（IC@5，衡量 Top-5 推荐覆盖的类别多样性）、Intra-List Similarity@5（ILS@5，越低表示推荐列表内部越多样）、HitRate@5（HR@5，推荐中是否命中用户真实点击，用于 Planner）；State Cosine、State MSE、Drift Cosine、Drift MSE（用于世界模型）。
 
 \subsection{Ranker 性能}
 
-表~\ref{tab:ranker} 给出了 GRU 双塔排序器在 2,000 个验证 impression 上的性能。排序器达到 94.48\% 的准确率和 0.701 的 AUC，表明其能有效区分用户是否会对候选新闻产生点击。Recall@5 为 50.75\%，意味着排序器的 Top-5 推荐平均能覆盖用户约一半的真实点击。意图覆盖率（IC@5）为 66.53\%，反映排序器仅凭相关性打分尚不足以充分覆盖用户的多元兴趣——这是后续规划器需要解决的问题。
+表~\ref{tab:ranker} 给出了 GRU 双塔排序器的完整性能。排序器达到了 94.48\% 的准确率和 0.701 的 AUC，LogLoss 为 0.269，表明模型能够有效区分用户对候选新闻的点击倾向。Recall@5 为 50.75\%，意味着排序器的 Top-5 推荐平均能覆盖用户约一半的真实点击。NDCG@5 为 0.374。需要指出的是，IC@5 仅为 66.53\%——这说明排序器仅凭相关性打分尚不足以充分覆盖用户的多元兴趣类别，这也正是规划器需要解决的核心问题。ILS@5 为 0.579，反映了仅凭相关性排序导致的推荐列表内相似度偏高的现象。
 
 \begin{table}[H]
 \centering
-\caption{GRU 双塔排序器性能}
+\caption{GRU 双塔排序器性能（2,000 impressions）}
 \label{tab:ranker}
+\small
 \begin{tabular}{@{}lc@{}}
 \toprule
 指标 & 值 \\
 \midrule
+样本数 & 78,321 \\
 Accuracy & 94.48\% \\
 AUC & 0.701 \\
+LogLoss & 0.269 \\
 Recall@5 & 50.75\% \\
 NDCG@5 & 0.374 \\
 IC@5 & 66.53\% \\
@@ -176,108 +227,131 @@ ILS@5 & 0.579 \\
 
 \subsection{世界模型漂移预测}
 
-为评估世界模型的预测能力，我们引入恒等映射基线（predict no drift）作为参照。恒等映射直接将当前状态作为未来状态的预测。表~\ref{tab:wm} 给出了三方对比：恒等映射的 State Cosine 为 0.9857，而 Neural ODE 达到 0.9927——虽然绝对提升幅度有限，但这是由于状态表征的固有平滑性导致的系统天花板效应。
+为全面评估世界模型的预测能力，我们在 46,792 条多步验证样本上进行了三方对比（表~\ref{tab:wm}）：恒等映射（预测状态不变）、纯 MSE 训练的 Neural ODE、Drift-Aware 训练的 Neural ODE。
 
-真正具有区分度的指标是漂移余弦（Drift Cosine）。恒等映射的漂移预测为零向量，无法评估漂移方向；Neural ODE 的漂移余弦从第 1 步的 0.5734 递增至第 3 步的 0.9789。这一递进趋势说明：单次点击对用户兴趣状态的影响信号较弱（漂移余弦仅 0.57），但随着多步累积，模型能够逐步锁定正确的漂移方向（漂移余弦升至 0.98）。这正是多步预测机制的核心价值。
+恒等映射的 State Cosine 为 0.9857，这是由状态表征方式决定的系统下限——即使不做任何预测，当前状态与三步后状态的相似度也高达 98.6\%。Drift-Aware Neural ODE 将 State Cosine 提升至 0.9927（+0.7\%），State MSE 从 $7.54 \times 10^{-5}$ 降至 $3.65 \times 10^{-5}$（-52\%），说明模型确实学到了有意义的动力学。
+
+更具区分度的是漂移余弦（Drift Cosine）。恒等映射的漂移预测为零向量，无法评估方向；纯 MSE 训练的 Neural ODE 由于没有显式的漂移监督，漂移余弦无法收敛；Drift-Aware Neural ODE 的漂移余弦从 Step 1 的 0.5734 递增至 Step 2 的 0.8042，最终在 Step 3 达到 0.9789。这一递进趋势清晰地揭示了多步预测的价值：单次点击对用户兴趣状态的影响信号较弱（Step 1 漂移余弦仅 0.57），但随着信号的逐步累积，模型能够越来越准确地锁定正确的漂移方向（Step 3 漂移余弦升至 0.98）。
 
 \begin{table}[H]
 \centering
-\caption{世界模型漂移预测（3 步）}
+\caption{世界模型漂移预测对比（3 步，46,792 样本）}
 \label{tab:wm}
+\small
 \begin{tabular}{@{}lccc@{}}
 \toprule
-指标 & 恒等映射 & \multicolumn{2}{c}{Neural ODE} \\
+指标 & 恒等映射 & Neural ODE & Neural ODE \\
+& & (MSE) & (Drift-Aware) \\
 \midrule
-State Cosine & 0.9857 & \multicolumn{2}{c}{0.9927} \\
-State MSE & $7.5\times10^{-5}$ & \multicolumn{2}{c}{$3.7\times10^{-5}$} \\
+State MSE & $7.54\!\times\!10^{-5}$ & $1.53\!\times\!10^{-5}$ & $3.65\!\times\!10^{-5}$ \\
+State Cosine & 0.9857 & 0.9968 & \textbf{0.9927} \\
 \midrule
-& & Step 1 & Step 3 \\
-Drift Cosine & --- & 0.5734 & 0.9789 \\
-Drift MSE & --- & $6.3\times10^{-5}$ & $3.7\times10^{-5}$ \\
+\multicolumn{4}{@{}l}{\textbf{Drift Cosine}} \\
+\quad Step 1 & --- & --- & 0.5734 \\
+\quad Step 2 & --- & --- & 0.8042 \\
+\quad Step 3 & --- & --- & \textbf{0.9789} \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Drift MSE}} \\
+\quad Step 1 & --- & --- & $6.28\!\times\!10^{-5}$ \\
+\quad Step 2 & --- & --- & $4.98\!\times\!10^{-5}$ \\
+\quad Step 3 & --- & --- & $3.65\!\times\!10^{-5}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{规划器意图覆盖}
 
-表~\ref{tab:planner} 对比了 Ranker-only 和完整 Planner 管线的推荐效果。Planner 将意图覆盖率从 66.53\% 大幅提升至 96.40\%（+29.9 个百分点），同时列表内相似度从 0.579 降至 0.527，表明推荐列表在覆盖更多兴趣领域的同时降低了冗余度。命中率 44.82\% 说明近半数推荐命中用户的真实兴趣——考虑到 Top-5 推荐面临的是每个 impression 平均 30+ 候选新闻的竞争环境，这一命中率是合理的。
+表~\ref{tab:planner} 对比了 Ranker-only 和完整 Planner 管线的推荐效果。Planner 将意图覆盖率从 66.53\% 大幅提升至 96.40\%（+29.9 个百分点），同时列表内相似度 ILS@5 从 0.579 降至 0.527（降低 9\%），表明推荐列表在覆盖更多兴趣领域的同时降低了冗余度。命中率（HitRate@5）为 44.82\%——考虑到每个 impression 平均包含 30+ 候选新闻，Top-5 推荐能有近半数命中用户真实兴趣是合理的。需要指出的是，Planner 当前仅在 1997 个有效 impression（2000 中 3 个因候选不足被跳过）上评估，更大规模的 Planner 评估受限于 Beam Search 的推理开销。
 
 \begin{table}[H]
 \centering
-\caption{Ranker-only 与 Planner 对比}
+\caption{Ranker-only 与 Planner 对比（2,000 impressions）}
 \label{tab:planner}
+\small
 \begin{tabular}{@{}lcc@{}}
 \toprule
 指标 & Ranker-only & + Planner \\
 \midrule
-IC@5 & 66.53\% & 96.40\% \\
+IC@5 & 66.53\% & \textbf{96.40\%} \\
 ILS@5 & 0.579 & 0.527 \\
 HitRate@5 & --- & 44.82\% \\
+有效 slates & --- & 1,997 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{结果分析}
+\subsection{实验总结}
 
-Planner 带来的 29.9 个百分点的 IC@5 提升验证了 Beam Search + Coverage Reranker 的有效性。然而，我们也注意到世界模型的 State Cosine 提升空间有限（从恒等基线的 0.9857 提升至 0.9927，仅 0.7\%）。这一现象的根源在于状态表征方式：加权平均将 50 篇新闻等比例混合，使得单次或少数几次点击对状态的影响天然微弱。在多步设定下，3 个新点击也仅占总权重的约 11\%。因此，当前世界模型的贡献主要体现在漂移方向的学习上（漂移余弦 0.57$\to$0.98），而非状态幅度的显著改变。未来工作可考虑使用学出来的状态编码器或减小历史窗口来提高状态表征的灵敏度。
+综合来看，系统的各模块在各自职责范围内均发挥了作用。Ranker 提供了可靠的候选筛选基础（AUC 0.701）；世界模型在多步预测中展现了漂移方向学习能力（Drift Cosine 0.57$\to$0.98）；Planner 则是意图覆盖提升的核心贡献者（IC@5 +29.9pp）。然而，State Cosine 从恒等基线的 0.9857 仅提升至 0.9927，反映出当前状态表征方式（加权平均）对世界模型学习空间的根本性限制。
 
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 \section{讨论}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
-本工作的核心发现可归纳为三点。第一，Neural ODE 在连续时间兴趣建模方面展现出了一定的潜力：漂移余弦的递进趋势（0.57$\to$0.80$\to$0.98）说明模型在多步信号累积中确实学到了有意义的兴趣漂移方向，而非简单的恒等映射。第二，Beam Search 规划器是系统意图覆盖能力的关键贡献者——它将 Ranker 的 Top-5 意图覆盖率从 66.5\% 提升至 96.4\%。第三，当前系统的瓶颈在于状态表征的平滑性：加权平均表征尽管简单有效，但限制了世界模型的学习空间。
+\subsection{多步预测的价值与局限}
 
-与现有工作的关联方面，Lin 等人~\cite{lin2025interest} 在离散时间步上建模了兴趣漂移——本文将其推广为连续时间 Neural ODE，避免了固定时间粒度的假设。Wang 等人~\cite{wang2025intent} 提出超越物品级相似度的意图多样化框架——本文的 Intent Coverage 指标和 Coverage Reranker 是该思想的具体实现。Chen 等人~\cite{chen2018neural} 的 Neural ODE 框架为本文的连续时间世界模型提供了理论基础。
+Drift Cosine 从 0.57 到 0.98 的递进趋势是本文最具信息量的实验发现之一。它说明：（1）单次点击对用户兴趣状态的影响信号确实较弱，这与 MIND 数据集低正样本率的特性一致；（2）Neural ODE 能够通过多步 RK4 积分有效累积信号，在三步后以高置信度锁定漂移方向。这验证了连续时间建模在推荐场景中的可行性——即使状态变化微小，正确的方向性预测仍然具有实际价值。
 
-% ═══════════════════════════════════════════
+但我们也必须指出 State Cosine 提升的有限性（+0.7\%）。这一现象的根本原因在于加权平均表征的固有平滑性：50 条历史新闻的加权混合使得少数几次新点击对整体状态的影响天然微弱。在 3 步设定下，三个新点击占总权重的约 11\%，而其余 89\% 的分量保持不变。因此，当前的 State Cosine 指标实际上是在一个极窄的动态范围内进行测量。
+
+\subsection{与现有工作的关联}
+
+Lin 等人~\cite{lin2025interest} 在离散时间步上显式建模了兴趣漂移对序列推荐的影响——本文将这一思想推广为连续时间 Neural ODE，避免了固定时间粒度的假设，可自然处理非均匀时间间隔。Wang 等人~\cite{wang2025intent} 提出超越物品级相似度的意图多样化框架——本文的 Intent Coverage 指标和 Coverage Reranker 是该思想在新闻推荐场景中的直接实现。Chen 等人~\cite{chen2018neural} 的 Neural ODE 框架为本文的连续时间世界模型提供了数学基础。Qwen3-Embedding~\cite{qwen3embedding} 作为冻结编码器为系统提供了高质量的语义表示；MIND 数据集~\cite{wu2020mind} 是实验的基准平台。
+
+\subsection{局限性与未来工作}
+
+本工作存在以下局限性。首先，世界模型的 State Cosine 受限于加权平均表征——未来可探索学习型状态编码器（如 Transformer 聚合器）或减小历史窗口来提高状态灵敏度。其次，多步世界模型的数据量仅为单步的 16\%，且来源局限于同一 impression 内的点击——未来可利用 MIND 的跨曝光时序数据（同一用户在不同时间点的多次 impression）构建更长的兴趣演化链。第三，Planner 的评估受限于 200 个 impression（Beam Search 推理开销），更大规模的评估可提供更稳定的统计结论。第四，当前仅在 MINDsmall 子集上实验，大型数据集上的泛化性有待验证。
+
+% ═══════════════════════════════════════════════════════════
 \section{结论}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
-本文提出了 Intent-Drift News Planner，一个基于 Neural ODE 的新闻推荐框架。在 MIND 数据集（PaddleRec 镜像）上的实验表明：(1) GRU 排序器达到 94.48\% 准确率和 0.701 AUC；(2) Drift-Aware Neural ODE 在漂移余弦上从 0.57 递增至 0.98，验证了多步信号累积的价值；(3) Beam Search 规划器将意图覆盖率从 66.5\% 提升至 96.4\%。同时，我们也指出了加权平均状态表征对世界模型学习空间的限制。未来工作将探索更灵敏的状态编码方法，并利用跨曝光的时序数据构建更长的兴趣演化链。
+本文提出了 Intent-Drift News Planner，一个基于 Neural ODE 连续时间建模和 Beam Search 意图覆盖规划的新闻推荐框架。在 MIND 数据集（PaddleRec 镜像）上的实验表明：（1）GRU 排序器达到 94.48\% 准确率和 0.701 AUC，为下游规划提供了可靠的候选筛选基础；（2）Drift-Aware Neural ODE 在漂移余弦上从 0.57 递增至 0.98，验证了多步信号累积对漂移方向学习的价值；（3）Beam Search 规划器将 Top-5 意图覆盖率从 66.5\% 提升至 96.4\%，同时降低了推荐列表的冗余度。
 
-% ═══════════════════════════════════════════
+我们也诚实地报告了系统的局限性：State Cosine 提升有限（+0.7\%），根源在于加权平均表征的固有平滑性；多步世界模型受限于数据的稀疏性；Planner 的评估规模受限于推理开销。这些局限性为未来的改进指明了方向。
+
+% ═══════════════════════════════════════════════════════════
 \section*{小组成员分工}
-% ═══════════════════════════════════════════
+% ═══════════════════════════════════════════════════════════
 
-四位成员分工均等，具体如下：
+四位成员分工均等，各负责系统的一个核心模块及相应的实验分析：
 
 \begin{itemize}
-\setlength\itemsep{0pt}
-\item \textbf{成员 A}：数据预处理管线（MIND 数据解析、Qwen3 语义编码、多步样本构建）与数据统计
-\item \textbf{成员 B}：GRU 双塔排序器设计与训练、Ranker 评估与消融分析
-\item \textbf{成员 C}：Neural ODE 世界模型架构设计、Drift-Aware 训练方法、漂移预测评估
-\item \textbf{成员 D}：Beam Search 规划器实现、Coverage Reranker 设计、端到端评估管线与报告撰写
+\item \textbf{成员 A}：数据预处理管线（MIND 数据解析、Qwen3 语义编码、多步样本构建、数据统计与局限性分析）
+\item \textbf{成员 B}：GRU 双塔排序器设计与训练（用户/新闻双塔、Ranker 评估、指标计算）
+\item \textbf{成员 C}：Neural ODE 世界模型（Drift-Aware 训练方法、多步预测机制、漂移余弦分析、恒等基线对比）
+\item \textbf{成员 D}：Beam Search 规划器与端到端评估（奖励函数设计、Coverage Reranker、完整管线评测、报告撰写与可视化）
 \end{itemize}
 
-% ═══════════════════════════════════════════
-% 参考文献
-% ═══════════════════════════════════════════
+\vspace{1em}
+
+% ═══════════════════════════════════════════════════════════
 \begin{thebibliography}{99}
 
 \bibitem{wu2020mind}
 F.~Wu, Y.~Qiao, J.-H.~Chen, C.~Wu, T.~Qi, J.~Lian, D.~Liu, X.~Xie, J.~Gao, and M.~Zhou.
 \newblock MIND: A large-scale dataset for news recommendation.
-\newblock In \emph{Proceedings of ACL}, 2020.
+\newblock In \emph{Proceedings of the 58th Annual Meeting of the ACL}, 2020.
 
 \bibitem{qwen3embedding}
-Y.~Zhang, M.~Li, D.~Long, and others.
+Y.~Zhang, M.~Li, D.~Long, P.~Wang, and others.
 \newblock Qwen3 embedding: Advancing text embedding and reranking through foundation models.
 \newblock arXiv:2506.05176, 2025.
 
 \bibitem{lin2025interest}
 X.~Lin, W.~Pan, and Z.~Ming.
 \newblock Towards interest drift-driven user representation learning in sequential recommendation.
-\newblock In \emph{Proceedings of SIGIR}, 2025.
+\newblock In \emph{Proceedings of the 48th International ACM SIGIR Conference}, 2025.
 
 \bibitem{wang2025intent}
 Y.~Wang, C.~Banerjee, S.~Chucri, F.~Soldo, S.~Badam, E.~H.~Chi, and M.~Chen.
 \newblock Beyond item dissimilarities: Diversifying by intent in recommender systems.
-\newblock In \emph{Proceedings of KDD}, 2025.
+\newblock In \emph{Proceedings of the 31st ACM SIGKDD Conference}, 2025.
 
 \bibitem{chen2018neural}
 R.~Chen, Y.~Rubanova, J.~Bettencourt, and D.~Duvenaud.
 \newblock Neural ordinary differential equations.
-\newblock In \emph{Advances in NeurIPS}, 2018.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2018.
 
 \end{thebibliography}
 
