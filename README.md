@@ -119,7 +119,7 @@ sequenceDiagram
 | beam_width | 5 | 每轮保留的并行路径数 |
 | branching_factor | 8 | 每条路径每轮展开的候选数 |
 | horizon | 3 | 前瞻轮数 |
-| ODE 调用次数 | ~120 次 | 5×8×3（每轮每条路径×候选数） |
+| ODE 调用次数 | ~88 次 | 第1轮 1×8 + 第2轮 5×8 + 第3轮 5×8 |
 | 最终输出 | Top-5 | 5 篇推荐 |
 
 ---
@@ -213,34 +213,27 @@ make eval-planner MAX_DEV_IMPRESSIONS=2000
 ```
 .
 ├── configs/default.json        训练配置
-├── DATA.md                     数据集详细说明
-├── Makefile                    构建入口
+├── Makefile                    构建入口（data / train / eval）
+├── pyproject.toml              依赖管理
 ├── README.md
+├── DATA.md                     数据集详细说明
 │
-├── data/
+├── data/                       （用户自行下载 MIND 数据集）
 │   ├── raw/mind/               MIND 原始 TSV（PaddleRec 镜像）
-│   └── processed/              Qwen3 编码后的 .npz 嵌入矩阵
+│   └── processed/              Qwen3 编码产物（make data 自动生成）
 │
-├── artifacts/
-│   └── eval_metrics.json       最终评测结果
-│
-├── report/
-│   ├── main.tex                LaTeX 学术报告
-│   └── main.pdf
-│
-├── slides/
-│   └── index.html              HTML 演示幻灯片
+├── artifacts/                  （make train 自动生成）
 │
 ├── scripts/
 │   ├── prepare_mind.py         数据预处理
 │   ├── train_ranker.py         Ranker 训练
-│   ├── train_world_model.py    世界模型训练（Neural ODE）
-│   └── eval.py                 评测
+│   ├── train_world_model.py    世界模型训练（Neural ODE，多步）
+│   └── eval.py                 评测（4 模式 + 恒等基线 + 漂移指标）
 │
 ├── src/agentic_rec/
 │   ├── data/                   数据加载
-│   ├── trainers/               Ranker & 世界模型训练逻辑
-│   ├── world_model/            Neural ODE（MLP + RK4）
+│   ├── trainers/               Ranker & 世界模型训练
+│   ├── world_model/            Neural ODE（Drift-Aware Loss）
 │   ├── planner/                Beam Search + Coverage Reranker
 │   ├── eval/                   评测指标
 │   └── export.py               checkpoint 导出
@@ -253,6 +246,6 @@ make eval-planner MAX_DEV_IMPRESSIONS=2000
 ## 参考文献
 
 1. Wu et al. *MIND: A Large-scale Dataset for News Recommendation.* ACL 2020.
-2. Qwen Team. *Qwen3 Embedding: Technical Report.* arXiv:2506.05176, 2025.
+2. Zhang et al. *Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models.* arXiv:2506.05176, 2025.
 3. Lin et al. *Towards Interest Drift-driven User Representation Learning in Sequential Recommendation.* SIGIR 2025.
 4. Wang et al. *Beyond Item Dissimilarities: Diversifying by Intent in Recommender Systems.* KDD 2025.
