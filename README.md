@@ -184,22 +184,19 @@ make data N_STEPS=3
 # 训练（Ranker + Neural ODE 世界模型）
 make train N_STEPS=3
 
-# ── 评测（4 种独立模式）──
+# ── 评测（4 种模式）──
 
-# 完整管线：Ranker + World Model + Planner
-make eval-all MAX_DEV_IMPRESSIONS=2000
+# 完整对比：Ranker + 恒等基线 + World Model（漂移指标）+ Planner
+make eval-all
 
-# 仅 Ranker：分类指标 + Top-K 意图覆盖
-make eval-ranker MAX_DEV_IMPRESSIONS=2000
+# 仅 Ranker
+make eval-ranker
 
-# 仅 World Model 单步预测：state → 1 click
-make eval-wm
+# 仅 World Model（含漂移指标 + 恒等基线）
+make eval-wm-multi
 
-# 仅 World Model 多步预测：state → N clicks（误差累积）
-make eval-wm-multi WORLD_MODEL_N_STEPS=3
-
-# 仅 Planner：Beam Search + Coverage Reranker
-make eval-planner MAX_DEV_IMPRESSIONS=2000
+# 仅 Planner
+make eval-planner
 ```
 
 > `eval-all` 自动包含恒等映射基线和漂移指标对比。`MAX_DEV_IMPRESSIONS=0` 使用全量验证集（192K impressions），设为 `5000` 使用 5K 采样以加速评估。
