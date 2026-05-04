@@ -189,13 +189,13 @@ make train N_STEPS=3
 # 完整对比：Ranker + 恒等基线 + World Model（漂移指标）+ Planner
 make eval-all
 
-# 仅 Ranker
+# 仅 Ranker（分类指标 + Top-K 意图覆盖）
 make eval-ranker
 
-# 仅 World Model（含漂移指标 + 恒等基线）
+# 仅 World Model（多步漂移预测 + 恒等基线）
 make eval-wm-multi
 
-# 仅 Planner
+# 仅 Planner（Beam Search + Coverage Reranker，输出 Intent Coverage / ILS / HitRate）
 make eval-planner
 ```
 
