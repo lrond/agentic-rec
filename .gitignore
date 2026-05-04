@@ -11,10 +11,13 @@ __pycache__/
 .pytest_cache/
 
 # Data — user downloads separately (see DATA.md)
-data/
+data/**
+!data/raw/mind/.gitkeep
+!data/processed/.gitkeep
 
 # Artifacts — generated at runtime
-artifacts/
+artifacts/**
+!artifacts/.gitkeep
 
 # IDE
 .vscode/
